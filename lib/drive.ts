@@ -22,6 +22,11 @@ function getDrive() {
 
   const credentials = JSON.parse(rawCreds);
 
+  // 🔧 CORREÇÃO: Arruma formatação da private_key
+  if (credentials.private_key) {
+    credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+  }
+
   const auth = new google.auth.GoogleAuth({
     credentials,
     scopes: ['https://www.googleapis.com/auth/drive'],
