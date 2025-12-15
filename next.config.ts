@@ -1,11 +1,7 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  api: {
-    bodyParser: {
-      sizeLimit: '200mb',
-    },
-  },
+  reactStrictMode: true,
 };
 
 export default nextConfig;
