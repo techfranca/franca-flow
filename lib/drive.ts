@@ -1,38 +1,39 @@
-import { google } from 'googleapis';
-import { Readable } from 'stream';
-import { getAnoAtual } from './clientes';
+import { google } from 'googleapis'
+import { Readable } from 'stream'
+import { getAnoAtual } from './clientes'
 
 // ========================
 // CONFIGURAÇÕES FIXAS
 // ========================
 
-const SHARED_DRIVE_ID = '0ABUaieLcZITFUk9PVA';
-const MARKETING_FOLDER_ID = '16c0xHvw61PeXuUAbY_pCC9Kvtk_7EYQF';
+const SHARED_DRIVE_ID = '0ABUaieLcZITFUk9PVA'
+const MARKETING_FOLDER_ID = '16c0xHvw61PeXuUAbY_pCC9Kvtk_7EYQF'
 
 // ========================
-// GOOGLE DRIVE (LAZY)
+// GOOGLE DRIVE (LAZY + SAFE)
 // ========================
 
 function getDrive() {
-  const rawCreds = process.env.GOOGLE_CREDENTIALS_JSON;
+  const rawCreds = process.env.GOOGLE_CREDENTIALS_JSON
 
   if (!rawCreds) {
-    throw new Error('GOOGLE_CREDENTIALS_JSON não definida');
+    throw new Error('GOOGLE_CREDENTIALS_JSON não definida')
   }
 
-  const credentials = JSON.parse(rawCreds);
+  const credentials = JSON.parse(rawCreds)
 
-  // 🔧 CORREÇÃO: Arruma formatação da private_key
-  if (credentials.private_key) {
-    credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
-  }
+  // 🔥 CORREÇÃO CRÍTICA PARA VERCEL / OAUTH
+  credentials.private_key = credentials.private_key.replace(/\\n/g, '\n')
 
   const auth = new google.auth.GoogleAuth({
     credentials,
     scopes: ['https://www.googleapis.com/auth/drive'],
-  });
+  })
 
-  return google.drive({ version: 'v3', auth });
+  return google.drive({
+    version: 'v3',
+    auth,
+  })
 }
 
 // ========================
@@ -40,14 +41,14 @@ function getDrive() {
 // ========================
 
 interface UploadParams {
-  clienteNome: string;
-  categoria: string;
-  tipo: 'Anúncios' | 'Materiais';
+  clienteNome: string
+  categoria: string
+  tipo: 'Anúncios' | 'Materiais'
   files: Array<{
-    name: string;
-    buffer: Buffer;
-    mimeType: string;
-  }>;
+    name: string
+    buffer: Buffer
+    mimeType: string
+  }>
 }
 
 // ========================
@@ -55,14 +56,14 @@ interface UploadParams {
 // ========================
 
 function getMesFormatado(): string {
-  const now = new Date();
+  const now = new Date()
 
-  const mesNumero = String(now.getMonth() + 1).padStart(2, '0');
-  const mesNome = now.toLocaleString('pt-BR', { month: 'long' });
+  const mesNumero = String(now.getMonth() + 1).padStart(2, '0')
+  const mesNome = now.toLocaleString('pt-BR', { month: 'long' })
 
   return `${mesNumero} - ${
     mesNome.charAt(0).toUpperCase() + mesNome.slice(1)
-  }`;
+  }`
 }
 
 async function findOrCreateFolder(
@@ -70,7 +71,7 @@ async function findOrCreateFolder(
   name: string,
   parentId: string
 ): Promise<string> {
-  const safeName = name.replace(/'/g, "\\'");
+  const safeName = name.replace(/'/g, "\\'")
 
   const res = await drive.files.list({
     corpora: 'drive',
@@ -84,10 +85,10 @@ async function findOrCreateFolder(
     fields: 'files(id)',
     supportsAllDrives: true,
     includeItemsFromAllDrives: true,
-  });
+  })
 
   if (res.data.files?.length) {
-    return res.data.files[0].id!;
+    return res.data.files[0].id!
   }
 
   const created = await drive.files.create({
@@ -98,9 +99,9 @@ async function findOrCreateFolder(
       parents: [parentId],
     },
     fields: 'id',
-  });
+  })
 
-  return created.data.id!;
+  return created.data.id!
 }
 
 async function navigateToFinalFolder(
@@ -110,54 +111,54 @@ async function navigateToFinalFolder(
     categoria,
     tipo,
   }: {
-    clienteNome: string;
-    categoria: string;
-    tipo: 'Anúncios' | 'Materiais';
+    clienteNome: string
+    categoria: string
+    tipo: 'Anúncios' | 'Materiais'
   }
 ): Promise<string> {
   const clientesId = await findOrCreateFolder(
     drive,
     'Clientes',
     MARKETING_FOLDER_ID
-  );
+  )
 
   const categoriaId = await findOrCreateFolder(
     drive,
     categoria,
     clientesId
-  );
+  )
 
   const clienteId = await findOrCreateFolder(
     drive,
     clienteNome,
     categoriaId
-  );
+  )
 
   const designCriativosId = await findOrCreateFolder(
     drive,
     'Design / Criativos',
     clienteId
-  );
+  )
 
   const tipoId = await findOrCreateFolder(
     drive,
     tipo,
     designCriativosId
-  );
+  )
 
   const anoId = await findOrCreateFolder(
     drive,
     getAnoAtual().toString(),
     tipoId
-  );
+  )
 
   const mesId = await findOrCreateFolder(
     drive,
     getMesFormatado(),
     anoId
-  );
+  )
 
-  return mesId;
+  return mesId
 }
 
 // ========================
@@ -171,13 +172,13 @@ export async function uploadFilesToDrive({
   files,
 }: UploadParams): Promise<{ success: boolean; message: string }> {
   try {
-    const drive = getDrive();
+    const drive = getDrive()
 
     const finalFolderId = await navigateToFinalFolder(drive, {
       clienteNome,
       categoria,
       tipo,
-    });
+    })
 
     await Promise.all(
       files.map((file) =>
@@ -194,17 +195,17 @@ export async function uploadFilesToDrive({
           fields: 'id',
         })
       )
-    );
+    )
 
     return {
       success: true,
       message: `${files.length} arquivo(s) enviados com sucesso para ${clienteNome}/${tipo}/${getMesFormatado()}!`,
-    };
+    }
   } catch (error) {
-    console.error('Erro no upload:', error);
+    console.error('Erro no upload:', error)
     return {
       success: false,
       message: 'Erro ao fazer upload dos arquivos.',
-    };
+    }
   }
 }
