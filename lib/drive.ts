@@ -1,7 +1,6 @@
 import { google } from 'googleapis';
 import { Readable } from 'stream';
 import { getAnoAtual } from './clientes';
-import credentials from './google-credentials.json';
 
 // ========================
 // CONFIGURAÇÕES FIXAS
@@ -10,16 +9,21 @@ import credentials from './google-credentials.json';
 // ID do Shared Drive
 const SHARED_DRIVE_ID = '0ABUaieLcZITFUk9PVA';
 
-// ID da pasta Marketing (raiz controlada)
+// ID da pasta Marketing
 const MARKETING_FOLDER_ID = '16c0xHvw61PeXuUAbY_pCC9Kvtk_7EYQF';
 
 // ========================
-// GOOGLE DRIVE CLIENT
+// GOOGLE AUTH (ENV)
 // ========================
+
+// ⚠️ O JSON COMPLETO da service account vem do .env
+const credentials = JSON.parse(
+  process.env.GOOGLE_CREDENTIALS_JSON as string
+);
 
 const auth = new google.auth.GoogleAuth({
   credentials,
-  scopes: ['https://www.googleapis.com/auth/drive'], // scope completo
+  scopes: ['https://www.googleapis.com/auth/drive'],
 });
 
 const drive = google.drive({ version: 'v3', auth });
@@ -52,19 +56,16 @@ function getMesFormatado(): string {
 
   const mesNumero = String(now.getMonth() + 1).padStart(2, '0');
 
-  const mesNome = now.toLocaleString('pt-BR', {
-    month: 'long',
-  });
+  const mesNome = now.toLocaleString('pt-BR', { month: 'long' });
 
-  const mesNomeCapitalizado =
+  const mesCapitalizado =
     mesNome.charAt(0).toUpperCase() + mesNome.slice(1);
 
-  return `${mesNumero} - ${mesNomeCapitalizado}`;
+  return `${mesNumero} - ${mesCapitalizado}`;
 }
 
 /**
- * Busca ou cria uma pasta no Google Drive
- * (Shared Drive safe + evita duplicação)
+ * Busca ou cria pasta (Shared Drive safe)
  */
 async function findOrCreateFolder(
   name: string,
@@ -72,7 +73,6 @@ async function findOrCreateFolder(
 ): Promise<string> {
   const safeName = name.replace(/'/g, "\\'");
 
-  // 1️⃣ Buscar pasta existente
   const res = await drive.files.list({
     corpora: 'drive',
     driveId: SHARED_DRIVE_ID,
@@ -82,16 +82,15 @@ async function findOrCreateFolder(
       and '${parentId}' in parents
       and trashed=false
     `,
-    fields: 'files(id, name)',
+    fields: 'files(id)',
     supportsAllDrives: true,
     includeItemsFromAllDrives: true,
   });
 
-  if (res.data.files && res.data.files.length > 0) {
+  if (res.data.files?.length) {
     return res.data.files[0].id!;
   }
 
-  // 2️⃣ Criar se não existir
   const created = await drive.files.create({
     supportsAllDrives: true,
     requestBody: {
@@ -106,8 +105,7 @@ async function findOrCreateFolder(
 }
 
 /**
- * Resolve o caminho FINAL respeitando
- * a estrutura LEGADA: "Design / Criativos"
+ * Resolve o caminho final (estrutura legada)
  */
 async function navigateToFinalFolder({
   clienteNome,
@@ -118,49 +116,33 @@ async function navigateToFinalFolder({
   categoria: string;
   tipo: 'Anúncios' | 'Materiais';
 }): Promise<string> {
-  // Marketing > Clientes
-  const clientesFolderId = await findOrCreateFolder(
+  const clientesId = await findOrCreateFolder(
     'Clientes',
     MARKETING_FOLDER_ID
   );
 
-  // Clientes > Categoria
-  const categoriaFolderId = await findOrCreateFolder(
-    categoria,
-    clientesFolderId
-  );
+  const categoriaId = await findOrCreateFolder(categoria, clientesId);
 
-  // Categoria > Cliente
-  const clienteFolderId = await findOrCreateFolder(
-    clienteNome,
-    categoriaFolderId
-  );
+  const clienteId = await findOrCreateFolder(clienteNome, categoriaId);
 
-  // Cliente > Design / Criativos (LEGADO)
-  const designCriativosFolderId = await findOrCreateFolder(
+  const designCriativosId = await findOrCreateFolder(
     'Design / Criativos',
-    clienteFolderId
+    clienteId
   );
 
-  // Design / Criativos > Anúncios | Materiais
-  const tipoFolderId = await findOrCreateFolder(
-    tipo,
-    designCriativosFolderId
-  );
+  const tipoId = await findOrCreateFolder(tipo, designCriativosId);
 
-  // Ano
-  const anoFolderId = await findOrCreateFolder(
+  const anoId = await findOrCreateFolder(
     getAnoAtual().toString(),
-    tipoFolderId
+    tipoId
   );
 
-  // Mês (FORMATO NOVO)
-  const mesFolderId = await findOrCreateFolder(
+  const mesId = await findOrCreateFolder(
     getMesFormatado(),
-    anoFolderId
+    anoId
   );
 
-  return mesFolderId;
+  return mesId;
 }
 
 // ========================
@@ -174,17 +156,15 @@ export async function uploadFilesToDrive({
   files,
 }: UploadParams): Promise<{ success: boolean; message: string }> {
   try {
-    // Resolver pasta final
     const finalFolderId = await navigateToFinalFolder({
       clienteNome,
       categoria,
       tipo,
     });
 
-    // Upload dos arquivos
     await Promise.all(
-      files.map(async (file) => {
-        await drive.files.create({
+      files.map((file) =>
+        drive.files.create({
           supportsAllDrives: true,
           requestBody: {
             name: file.name,
@@ -194,20 +174,20 @@ export async function uploadFilesToDrive({
             mimeType: file.mimeType,
             body: Readable.from(file.buffer),
           },
-          fields: 'id, name',
-        });
-      })
+          fields: 'id',
+        })
+      )
     );
 
     return {
       success: true,
-      message: `${files.length} arquivo(s) enviado(s) com sucesso para ${clienteNome}/${tipo}/${getMesFormatado()}!`,
+      message: `${files.length} arquivo(s) enviados com sucesso para ${clienteNome}/${tipo}/${getMesFormatado()}!`,
     };
   } catch (error) {
     console.error('Erro no upload:', error);
     return {
       success: false,
-      message: 'Erro ao fazer upload dos arquivos. Tente novamente.',
+      message: 'Erro ao fazer upload dos arquivos.',
     };
   }
 }
