@@ -6,27 +6,29 @@ import { getAnoAtual } from './clientes';
 // CONFIGURAÇÕES FIXAS
 // ========================
 
-// ID do Shared Drive
 const SHARED_DRIVE_ID = '0ABUaieLcZITFUk9PVA';
-
-// ID da pasta Marketing
 const MARKETING_FOLDER_ID = '16c0xHvw61PeXuUAbY_pCC9Kvtk_7EYQF';
 
 // ========================
-// GOOGLE AUTH (ENV)
+// GOOGLE DRIVE (LAZY)
 // ========================
 
-// ⚠️ O JSON COMPLETO da service account vem do .env
-const credentials = JSON.parse(
-  process.env.GOOGLE_CREDENTIALS_JSON as string
-);
+function getDrive() {
+  const rawCreds = process.env.GOOGLE_CREDENTIALS_JSON;
 
-const auth = new google.auth.GoogleAuth({
-  credentials,
-  scopes: ['https://www.googleapis.com/auth/drive'],
-});
+  if (!rawCreds) {
+    throw new Error('GOOGLE_CREDENTIALS_JSON não definida');
+  }
 
-const drive = google.drive({ version: 'v3', auth });
+  const credentials = JSON.parse(rawCreds);
+
+  const auth = new google.auth.GoogleAuth({
+    credentials,
+    scopes: ['https://www.googleapis.com/auth/drive'],
+  });
+
+  return google.drive({ version: 'v3', auth });
+}
 
 // ========================
 // TYPES
@@ -47,27 +49,19 @@ interface UploadParams {
 // HELPERS
 // ========================
 
-/**
- * Retorna o mês no formato:
- * "09 - Setembro"
- */
 function getMesFormatado(): string {
   const now = new Date();
 
   const mesNumero = String(now.getMonth() + 1).padStart(2, '0');
-
   const mesNome = now.toLocaleString('pt-BR', { month: 'long' });
 
-  const mesCapitalizado =
-    mesNome.charAt(0).toUpperCase() + mesNome.slice(1);
-
-  return `${mesNumero} - ${mesCapitalizado}`;
+  return `${mesNumero} - ${
+    mesNome.charAt(0).toUpperCase() + mesNome.slice(1)
+  }`;
 }
 
-/**
- * Busca ou cria pasta (Shared Drive safe)
- */
 async function findOrCreateFolder(
+  drive: ReturnType<typeof getDrive>,
   name: string,
   parentId: string
 ): Promise<string> {
@@ -104,40 +98,56 @@ async function findOrCreateFolder(
   return created.data.id!;
 }
 
-/**
- * Resolve o caminho final (estrutura legada)
- */
-async function navigateToFinalFolder({
-  clienteNome,
-  categoria,
-  tipo,
-}: {
-  clienteNome: string;
-  categoria: string;
-  tipo: 'Anúncios' | 'Materiais';
-}): Promise<string> {
+async function navigateToFinalFolder(
+  drive: ReturnType<typeof getDrive>,
+  {
+    clienteNome,
+    categoria,
+    tipo,
+  }: {
+    clienteNome: string;
+    categoria: string;
+    tipo: 'Anúncios' | 'Materiais';
+  }
+): Promise<string> {
   const clientesId = await findOrCreateFolder(
+    drive,
     'Clientes',
     MARKETING_FOLDER_ID
   );
 
-  const categoriaId = await findOrCreateFolder(categoria, clientesId);
+  const categoriaId = await findOrCreateFolder(
+    drive,
+    categoria,
+    clientesId
+  );
 
-  const clienteId = await findOrCreateFolder(clienteNome, categoriaId);
+  const clienteId = await findOrCreateFolder(
+    drive,
+    clienteNome,
+    categoriaId
+  );
 
   const designCriativosId = await findOrCreateFolder(
+    drive,
     'Design / Criativos',
     clienteId
   );
 
-  const tipoId = await findOrCreateFolder(tipo, designCriativosId);
+  const tipoId = await findOrCreateFolder(
+    drive,
+    tipo,
+    designCriativosId
+  );
 
   const anoId = await findOrCreateFolder(
+    drive,
     getAnoAtual().toString(),
     tipoId
   );
 
   const mesId = await findOrCreateFolder(
+    drive,
     getMesFormatado(),
     anoId
   );
@@ -156,7 +166,9 @@ export async function uploadFilesToDrive({
   files,
 }: UploadParams): Promise<{ success: boolean; message: string }> {
   try {
-    const finalFolderId = await navigateToFinalFolder({
+    const drive = getDrive();
+
+    const finalFolderId = await navigateToFinalFolder(drive, {
       clienteNome,
       categoria,
       tipo,
