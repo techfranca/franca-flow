@@ -23,10 +23,10 @@ export async function notificarTime({
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
+        token: token, // 🔥 AQUI está a correção
       },
       body: JSON.stringify({
-        number: groupId, // ✅ campo correto
+        number: groupId,
         text: `📥 *Novo upload recebido!*
 
 👤 Cliente: ${clienteNome}
