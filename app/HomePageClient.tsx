@@ -6,9 +6,9 @@ import { CLIENTES, CATEGORIAS, getMesAtual, getAnoAtual, getClientePorCodigo } f
 import { useSearchParams } from "next/navigation";
 import { useDirectUpload } from "@/hooks/useDirectUpload";
 
-// Limite de tamanho: 50MB por arquivo, 200MB total
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
-const MAX_TOTAL_SIZE = 200 * 1024 * 1024; // 200MB
+// Limites atualizados para suportar arquivos grandes
+const MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024; // 5GB por arquivo
+const MAX_TOTAL_SIZE = 10 * 1024 * 1024 * 1024; // 10GB total
 
 export default function HomePage() {
   const searchParams = useSearchParams();
@@ -47,24 +47,24 @@ export default function HomePage() {
   };
 
   const adicionarArquivos = (novosArquivos: File[]) => {
-    // Validar tamanho de cada arquivo
+    // Validar tamanho de cada arquivo (máximo 5GB)
     const arquivosGrandes = novosArquivos.filter(f => f.size > MAX_FILE_SIZE);
     if (arquivosGrandes.length > 0) {
       setMensagem({
         tipo: "erro",
-        texto: `Alguns arquivos são muito grandes (máximo 50MB por arquivo): ${arquivosGrandes.map(f => f.name).join(", ")}`,
+        texto: `Alguns arquivos são muito grandes (máximo 5GB por arquivo): ${arquivosGrandes.map(f => f.name).join(", ")}`,
       });
       return;
     }
 
-    // Validar tamanho total
+    // Validar tamanho total (máximo 10GB)
     const tamanhoAtual = arquivos.reduce((sum, f) => sum + f.size, 0);
     const tamanhoNovos = novosArquivos.reduce((sum, f) => sum + f.size, 0);
     
     if (tamanhoAtual + tamanhoNovos > MAX_TOTAL_SIZE) {
       setMensagem({
         tipo: "erro",
-        texto: `O tamanho total dos arquivos não pode ultrapassar 200MB. Atual: ${((tamanhoAtual + tamanhoNovos) / 1024 / 1024).toFixed(1)}MB`,
+        texto: `O tamanho total dos arquivos não pode ultrapassar 10GB. Atual: ${((tamanhoAtual + tamanhoNovos) / 1024 / 1024 / 1024).toFixed(2)}GB`,
       });
       return;
     }
@@ -402,7 +402,7 @@ export default function HomePage() {
                   Clique ou arraste os arquivos aqui
                 </p>
                 <p className="text-gray-500 text-sm">
-                  Fotos e vídeos (máx. 50MB por arquivo)
+                  Fotos e vídeos (máx. 5GB por arquivo)
                 </p>
               </div>
 
@@ -417,7 +417,10 @@ export default function HomePage() {
                     <span className={`text-xs font-bold ${
                       tamanhoTotal > MAX_TOTAL_SIZE ? "text-red-600" : "text-franca-green"
                     }`}>
-                      {(tamanhoTotal / 1024 / 1024).toFixed(1)} MB / 200 MB
+                      {tamanhoTotal >= 1024 * 1024 * 1024 
+                        ? `${(tamanhoTotal / 1024 / 1024 / 1024).toFixed(2)} GB / 10 GB`
+                        : `${(tamanhoTotal / 1024 / 1024).toFixed(1)} MB / 10 GB`
+                      }
                     </span>
                   </div>
 
