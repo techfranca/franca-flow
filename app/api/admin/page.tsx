@@ -14,6 +14,14 @@ interface Cliente {
 
 const CATEGORIAS = ['Negócio Local', 'Infoproduto', 'Inside Sales', 'E-commerce']
 
+// Cores das categorias
+const CORES_CATEGORIAS: Record<string, { bg: string; text: string; border: string }> = {
+  'E-commerce': { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200' },
+  'Negócio Local': { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
+  'Infoproduto': { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
+  'Inside Sales': { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200' },
+}
+
 export default function AdminPage() {
   const router = useRouter()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -26,6 +34,7 @@ export default function AdminPage() {
   const [showAddForm, setShowAddForm] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategoria, setSelectedCategoria] = useState<string>('all')
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; nome: string } | null>(null)
 
   // Form de adicionar
   const [novoCliente, setNovoCliente] = useState({
@@ -111,8 +120,6 @@ export default function AdminPage() {
   }
 
   const handleRemoverCliente = async (id: string, nome: string) => {
-    if (!confirm(`Tem certeza que deseja remover "${nome}"?`)) return
-
     try {
       const response = await fetch('/api/admin/clientes', {
         method: 'DELETE',
@@ -122,6 +129,7 @@ export default function AdminPage() {
 
       if (response.ok) {
         await carregarClientes()
+        setDeleteConfirm(null)
       }
     } catch (err) {
       alert('Erro ao remover cliente')
@@ -132,15 +140,12 @@ export default function AdminPage() {
     const link = `${window.location.origin}/?c=${codigo}`
     navigator.clipboard.writeText(link)
     
-    // Feedback visual
-    const btn = document.getElementById(`copy-${codigo}`)
-    if (btn) {
-      const originalText = btn.innerHTML
-      btn.innerHTML = '✓ Copiado!'
-      setTimeout(() => {
-        btn.innerHTML = originalText
-      }, 2000)
-    }
+    // Feedback visual com toast simples
+    const toast = document.createElement('div')
+    toast.className = 'fixed top-4 right-4 bg-franca-green text-franca-blue px-4 py-3 rounded-lg shadow-lg font-semibold z-50 animate-fade-in'
+    toast.innerHTML = '✓ Link copiado!'
+    document.body.appendChild(toast)
+    setTimeout(() => toast.remove(), 2000)
   }
 
   const gerarCodigo = (nome: string) => {
@@ -216,29 +221,38 @@ export default function AdminPage() {
     )
   }
 
- // Painel admin
+  // Painel admin
   return (
-    <div className="min-h-screen bg-gradient-to-br from-franca-green via-white to-franca-green-dark px-4 py-8">
+    <div className="min-h-screen bg-gray-50 px-4 py-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="glass-effect rounded-3xl shadow-franca-lg p-8 mb-6">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
           <div className="flex justify-between items-center">
             <div>
               <div className="flex items-center gap-4 mb-2">
-                <div className="w-12 h-12 bg-gradient-to-br from-franca-green to-franca-green-dark rounded-xl flex items-center justify-center shadow-franca">
-                  <Image src="/logo.png" alt="Franca Logo" width={30} height={30} />
+                <div className="w-10 h-10 bg-gradient-to-br from-franca-green to-franca-green-dark rounded-xl flex items-center justify-center">
+                  <Image src="/logo.png" alt="Franca Logo" width={24} height={24} />
                 </div>
-                <h1 className="text-3xl font-bold text-franca-blue">
-                  PAINEL ADMIN
-                </h1>
+                <div>
+                  <h1 className="text-2xl font-bold text-franca-blue">
+                    PAINEL ADMIN
+                  </h1>
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="text-sm text-gray-600">
+                      {clientes.length} clientes ativos
+                    </span>
+                    <span className="text-gray-300">•</span>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      <span className="text-xs text-gray-500">Sistema online</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <p className="text-gray-600 text-sm">
-                Gerenciamento de clientes • {clientes.length} cadastrados
-              </p>
             </div>
             <button
               onClick={() => router.push('/')}
-              className="px-4 py-2 bg-white border-2 border-gray-200 rounded-xl hover:border-franca-green transition-all text-franca-blue font-semibold"
+              className="px-4 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-all text-gray-700 font-medium text-sm"
             >
               🧪 Testar Upload
             </button>
@@ -246,20 +260,18 @@ export default function AdminPage() {
         </div>
 
         {/* Ações principais */}
-        <div className="glass-effect rounded-3xl shadow-franca-lg p-6 mb-6">
-          <div className="flex flex-wrap gap-4">
-            <button
-              onClick={() => setShowAddForm(!showAddForm)}
-              className="flex-1 min-w-[200px] bg-gradient-to-r from-franca-green to-franca-green-dark hover:from-franca-green-dark hover:to-franca-green text-franca-blue font-bold py-4 px-6 rounded-xl transition-all duration-300 shadow-franca hover:shadow-franca-lg"
-            >
-              {showAddForm ? '✕ Cancelar' : '+ Adicionar Cliente'}
-            </button>
-          </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+          <button
+            onClick={() => setShowAddForm(!showAddForm)}
+            className="w-full sm:w-auto bg-gradient-to-r from-franca-green to-franca-green-dark hover:from-franca-green-dark hover:to-franca-green text-franca-blue font-semibold py-3 px-6 rounded-lg transition-all duration-300 shadow-sm hover:shadow"
+          >
+            {showAddForm ? '✕ Cancelar' : '+ Novo Cliente'}
+          </button>
 
           {/* Formulário de adicionar */}
           {showAddForm && (
-            <form onSubmit={handleAdicionarCliente} className="mt-6 space-y-4 bg-white p-6 rounded-xl border-2 border-franca-green border-opacity-20">
-              <h3 className="text-xl font-bold text-franca-blue mb-4">
+            <form onSubmit={handleAdicionarCliente} className="mt-6 space-y-4 bg-gray-50 p-6 rounded-xl border border-gray-200">
+              <h3 className="text-lg font-semibold text-franca-blue mb-4">
                 Novo Cliente
               </h3>
 
@@ -347,7 +359,7 @@ export default function AdminPage() {
         </div>
 
         {/* Filtros */}
-        <div className="glass-effect rounded-3xl shadow-franca-lg p-6 mb-6">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
           <div className="flex flex-wrap gap-4">
             <div className="flex-1 min-w-[250px]">
               <input
@@ -355,13 +367,13 @@ export default function AdminPage() {
                 placeholder="🔍 Buscar por nome ou código..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-4 py-3 bg-white border-2 border-gray-100 rounded-xl focus:border-franca-green focus:ring-4 focus:ring-franca-green focus:ring-opacity-10 outline-none transition-all text-franca-blue"
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:border-franca-green focus:ring-2 focus:ring-franca-green focus:ring-opacity-20 outline-none transition-all text-gray-900"
               />
             </div>
             <select
               value={selectedCategoria}
               onChange={(e) => setSelectedCategoria(e.target.value)}
-              className="px-4 py-3 bg-white border-2 border-gray-100 rounded-xl focus:border-franca-green outline-none transition-all text-franca-blue font-medium"
+              className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:border-franca-green focus:ring-2 focus:ring-franca-green focus:ring-opacity-20 outline-none transition-all text-gray-900 font-medium"
             >
               <option value="all">Todas Categorias</option>
               {CATEGORIAS.map(cat => (
@@ -369,68 +381,129 @@ export default function AdminPage() {
               ))}
             </select>
           </div>
+
+          {/* Legenda de cores */}
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <p className="text-xs font-semibold text-gray-500 mb-2">LEGENDA DE CORES:</p>
+            <div className="flex flex-wrap gap-3">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <span className="text-sm text-gray-700">E-commerce</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                <span className="text-sm text-gray-700">Negócio Local</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+                <span className="text-sm text-gray-700">Infoproduto</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                <span className="text-sm text-gray-700">Inside Sales</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Lista de clientes */}
-        <div className="glass-effect rounded-3xl shadow-franca-lg p-6">
-          <h2 className="text-2xl font-bold text-franca-blue mb-6">
-            📋 Clientes ({clientesFiltrados.length})
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <h2 className="text-lg font-semibold text-franca-blue mb-4 flex items-center gap-2">
+            <span>📋</span>
+            <span>Clientes ativos</span>
+            <span className="text-gray-400">•</span>
+            <span className="text-gray-600 font-normal">{clientesFiltrados.length}</span>
           </h2>
 
           {clientesFiltrados.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-gray-500 text-lg">
+              <p className="text-gray-500">
                 {searchTerm || selectedCategoria !== 'all' 
-                  ? 'Nenhum cliente encontrado com esses filtros'
-                  : 'Nenhum cliente cadastrado ainda'}
+                  ? 'Nenhum cliente encontrado'
+                  : 'Nenhum cliente cadastrado'}
               </p>
             </div>
           ) : (
-            <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
-              {clientesFiltrados.map((cliente) => (
-                <div
-                  key={cliente.id}
-                  className="bg-white border-2 border-gray-100 rounded-xl p-5 hover:border-franca-green transition-all"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <h3 className="text-xl font-bold text-franca-blue mb-1">
-                        {cliente.nome}
-                      </h3>
-                      <p className="text-sm text-gray-600 mb-3">
-                        📂 {cliente.categoria}
-                      </p>
-                      <div className="bg-gray-50 px-3 py-2 rounded-lg inline-flex items-center gap-2">
-                        <span className="text-xs text-gray-500">Link:</span>
-                        <code className="text-sm font-mono text-franca-blue">
+            <div className="space-y-2 max-h-[600px] overflow-y-auto pr-2">
+              {clientesFiltrados.map((cliente) => {
+                const cores = CORES_CATEGORIAS[cliente.categoria] || { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200' }
+                
+                return (
+                  <div
+                    key={cliente.id}
+                    className={`group border-2 ${cores.border} ${cores.bg} rounded-lg p-4 hover:shadow-sm transition-all`}
+                  >
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className={`font-semibold ${cores.text} truncate`}>
+                            {cliente.nome}
+                          </h3>
+                          <span className={`text-xs px-2 py-0.5 ${cores.bg} ${cores.text} border ${cores.border} rounded-full whitespace-nowrap font-medium`}>
+                            {cliente.categoria}
+                          </span>
+                        </div>
+                        <code className="text-xs text-gray-500 font-mono">
                           {window.location.origin}/?c={cliente.codigo}
                         </code>
                       </div>
-                    </div>
 
-                    <div className="flex gap-2">
-                      <button
-                        id={`copy-${cliente.codigo}`}
-                        onClick={() => copiarLink(cliente.codigo)}
-                        className="px-4 py-2 bg-franca-green hover:bg-franca-green-dark text-franca-blue font-semibold rounded-lg transition-all text-sm"
-                        title="Copiar link"
-                      >
-                        📋 Copiar
-                      </button>
-                      <button
-                        onClick={() => handleRemoverCliente(cliente.id, cliente.nome)}
-                        className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-semibold rounded-lg transition-all text-sm"
-                        title="Remover cliente"
-                      >
-                        🗑️
-                      </button>
+                      {/* Ações sempre visíveis */}
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => copiarLink(cliente.codigo)}
+                          className="p-2 hover:bg-white/50 rounded-lg transition-all text-gray-500 hover:text-gray-700"
+                          title="Copiar link"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => setDeleteConfirm({ id: cliente.id, nome: cliente.nome })}
+                          className="p-2 hover:bg-red-50 rounded-lg transition-all text-gray-400 hover:text-red-600"
+                          title="Excluir cliente"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
+
+        {/* Modal de confirmação de exclusão */}
+        {deleteConfirm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
+            <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Excluir cliente
+              </h3>
+              <p className="text-gray-600 mb-6">
+                Tem certeza que deseja excluir <strong>{deleteConfirm.nome}</strong>? Esta ação não pode ser desfeita.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  className="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-lg transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => handleRemoverCliente(deleteConfirm.id, deleteConfirm.nome)}
+                  className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-all"
+                >
+                  Excluir
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
