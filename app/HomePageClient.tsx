@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import { getMesAtual, getAnoAtual } from "@/lib/clientes";
-import { getClientePorCodigo } from "@/lib/kv";
 import { useSearchParams } from "next/navigation";
 import { useDirectUpload } from "@/hooks/useDirectUpload";
 
@@ -30,16 +29,25 @@ export default function HomePage() {
 
   // Detectar cliente pela URL
   useEffect(() => {
-    if (codigoCliente) {
-      getClientePorCodigo(codigoCliente).then(clienteInfo => {
-        if (clienteInfo) {
-          setClienteSelecionado(clienteInfo.nome);
-          setCategoriaSelecionada(clienteInfo.categoria);
-          setModoCliente(true);
-        }
-      });
-    }
-  }, [codigoCliente]);
+  if (!codigoCliente) {
+    setModoCliente(false);
+    return;
+  }
+
+  fetch(`/api/clientes/${codigoCliente}`)
+    .then(async (res) => {
+      if (!res.ok) throw new Error("Cliente não encontrado");
+      return res.json();
+    })
+    .then((clienteInfo) => {
+      setClienteSelecionado(clienteInfo.nome);
+      setCategoriaSelecionada(clienteInfo.categoria);
+      setModoCliente(true);
+    })
+    .catch(() => {
+      setModoCliente(false);
+    });
+}, [codigoCliente]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
