@@ -44,3 +44,6 @@ next-env.d.ts
 lib/google-credentials.json
 google-credentials.json
 *credentials*.json
+
+.vercel
+.env*.local
