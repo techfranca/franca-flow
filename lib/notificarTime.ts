@@ -3,11 +3,13 @@ export async function notificarTime({
   categoria,
   tipo,
   quantidade,
+  driveLink, // Adiciona o driveLink aqui
 }: {
   clienteNome: string
   categoria: string
   tipo: string
   quantidade: number
+  driveLink?: string
 }) {
   const token = process.env.UAIZAP_TOKEN
   const groupId = process.env.UAIZAP_GROUP_ID
@@ -42,6 +44,7 @@ export async function notificarTime({
 📂 Categoria: ${categoria}
 📁 Tipo: ${tipo}
 📎 Arquivos: ${quantidade}
+${driveLink ? `📂 Pasta no Drive:\n${driveLink}` : ""}
 🕒 Data: ${dataHoraBrasil}`,
         }),
       }

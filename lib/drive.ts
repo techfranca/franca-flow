@@ -61,9 +61,7 @@ function getMesFormatado(): string {
   const mesNumero = String(now.getMonth() + 1).padStart(2, '0')
   const mesNome = now.toLocaleString('pt-BR', { month: 'long' })
 
-  return `${mesNumero} - ${
-    mesNome.charAt(0).toUpperCase() + mesNome.slice(1)
-  }`
+  return `${mesNumero} - ${mesNome.charAt(0).toUpperCase() + mesNome.slice(1)}`
 }
 
 async function findOrCreateFolder(
@@ -76,12 +74,7 @@ async function findOrCreateFolder(
   const res = await drive.files.list({
     corpora: 'drive',
     driveId: SHARED_DRIVE_ID,
-    q: `
-      name='${safeName}'
-      and mimeType='application/vnd.google-apps.folder'
-      and '${parentId}' in parents
-      and trashed=false
-    `,
+    q: `name='${safeName}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`,
     fields: 'files(id)',
     supportsAllDrives: true,
     includeItemsFromAllDrives: true,
@@ -116,47 +109,13 @@ async function navigateToFinalFolder(
     tipo: 'Anúncios' | 'Materiais'
   }
 ): Promise<string> {
-  const clientesId = await findOrCreateFolder(
-    drive,
-    'Clientes',
-    MARKETING_FOLDER_ID
-  )
-
-  const categoriaId = await findOrCreateFolder(
-    drive,
-    categoria,
-    clientesId
-  )
-
-  const clienteId = await findOrCreateFolder(
-    drive,
-    clienteNome,
-    categoriaId
-  )
-
-  const designCriativosId = await findOrCreateFolder(
-    drive,
-    'Design / Criativos',
-    clienteId
-  )
-
-  const tipoId = await findOrCreateFolder(
-    drive,
-    tipo,
-    designCriativosId
-  )
-
-  const anoId = await findOrCreateFolder(
-    drive,
-    getAnoAtual().toString(),
-    tipoId
-  )
-
-  const mesId = await findOrCreateFolder(
-    drive,
-    getMesFormatado(),
-    anoId
-  )
+  const clientesId = await findOrCreateFolder(drive, 'Clientes', MARKETING_FOLDER_ID)
+  const categoriaId = await findOrCreateFolder(drive, categoria, clientesId)
+  const clienteId = await findOrCreateFolder(drive, clienteNome, categoriaId)
+  const designCriativosId = await findOrCreateFolder(drive, 'Design / Criativos', clienteId)
+  const tipoId = await findOrCreateFolder(drive, tipo, designCriativosId)
+  const anoId = await findOrCreateFolder(drive, getAnoAtual().toString(), tipoId)
+  const mesId = await findOrCreateFolder(drive, getMesFormatado(), anoId)
 
   return mesId
 }
@@ -170,7 +129,7 @@ export async function uploadFilesToDrive({
   categoria,
   tipo,
   files,
-}: UploadParams): Promise<{ success: boolean; message: string }> {
+}: UploadParams): Promise<{ success: boolean; message: string; folderId?: string }> {
   try {
     const drive = getDrive()
 
@@ -199,7 +158,8 @@ export async function uploadFilesToDrive({
 
     return {
       success: true,
-      message: `${files.length} arquivo(s) enviados com sucesso para ${clienteNome}/${tipo}/${getMesFormatado()}!`,
+      message: `${files.length} arquivo(s) enviados com sucesso!`,
+      folderId: finalFolderId, // Retorna o ID da pasta criada
     }
   } catch (error) {
     console.error('Erro no upload:', error)

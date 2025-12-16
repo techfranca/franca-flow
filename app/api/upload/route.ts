@@ -49,11 +49,17 @@ export async function POST(request: NextRequest) {
     })
 
     if (result.success) {
+      // Passar o folderId como parâmetro para o notificarTime
+      const driveLink = result.folderId
+        ? `https://drive.google.com/drive/folders/${result.folderId}`
+        : undefined
+
       await notificarTime({
         clienteNome,
         categoria,
         tipo,
         quantidade: files.length,
+        driveLink, // Passando o link da pasta para a notificação
       })
 
       return NextResponse.json({
@@ -74,4 +80,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-
