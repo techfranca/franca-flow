@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import { CLIENTES, CATEGORIAS, getMesAtual, getAnoAtual, getClientePorCodigo } from "@/lib/clientes";
 import { useSearchParams } from "next/navigation";
+import { useDirectUpload } from "@/hooks/useDirectUpload";
 
 // Limite de tamanho: 50MB por arquivo, 200MB total
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
@@ -22,6 +23,9 @@ export default function HomePage() {
   const [dragActive, setDragActive] = useState(false);
   const [modoCliente, setModoCliente] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  
+  // Hook para upload direto de arquivos grandes
+  const { upload: directUpload, progress: uploadProgress } = useDirectUpload();
 
   // Detectar cliente pela URL
   useEffect(() => {
@@ -109,39 +113,89 @@ export default function HomePage() {
     setUploading(true);
 
     try {
-      const formData = new FormData();
-      formData.append("clienteNome", clienteSelecionado);
-      formData.append("categoria", categoriaSelecionada);
-      formData.append("tipo", tipoSelecionado);
+      // Detecta tamanho total
+      const tamanhoTotal = arquivos.reduce((sum, f) => sum + f.size, 0);
+      const LIMITE_SERVIDOR = 50 * 1024 * 1024; // 50MB
 
-      arquivos.forEach((arquivo, index) => {
-        formData.append(`file_${index}`, arquivo);
-      });
+      if (tamanhoTotal <= LIMITE_SERVIDOR) {
+        // ==========================================
+        // ARQUIVOS PEQUENOS: USA ROTA ATUAL
+        // ==========================================
+        const formData = new FormData();
+        formData.append("clienteNome", clienteSelecionado);
+        formData.append("categoria", categoriaSelecionada);
+        formData.append("tipo", tipoSelecionado);
 
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
+        arquivos.forEach((arquivo, index) => {
+          formData.append(`file_${index}`, arquivo);
+        });
 
-      const data = await response.json();
+        const response = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
 
-      if (response.ok) {
+        const data = await response.json();
+
+        if (response.ok) {
+          setMensagem({
+            tipo: "sucesso",
+            texto: data.message,
+          });
+          if (!modoCliente) {
+            setClienteSelecionado("");
+            setCategoriaSelecionada("");
+          }
+          setTipoSelecionado("");
+          setArquivos([]);
+        } else {
+          setMensagem({
+            tipo: "erro",
+            texto: data.error || "Erro ao fazer upload.",
+          });
+        }
+      } else {
+        // ==========================================
+        // ARQUIVOS GRANDES: USA UPLOAD DIRETO
+        // ==========================================
+        const uploadedFileIds: string[] = [];
+        let folderId = '';
+
+        for (const arquivo of arquivos) {
+          const fileId = await directUpload(arquivo, {
+            clienteNome: clienteSelecionado,
+            categoria: categoriaSelecionada,
+            tipo: tipoSelecionado,
+          });
+          uploadedFileIds.push(fileId);
+        }
+
+        // Notifica após todos uploads
+        await fetch('/api/notify-after-upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            clienteNome: clienteSelecionado,
+            categoria: categoriaSelecionada,
+            tipo: tipoSelecionado,
+            quantidade: arquivos.length,
+            driveLink: folderId 
+              ? `https://drive.google.com/drive/folders/${folderId}`
+              : undefined,
+          }),
+        });
+
         setMensagem({
           tipo: "sucesso",
-          texto: data.message,
+          texto: `${arquivos.length} arquivo(s) enviados com sucesso!`,
         });
-        // Resetar formulário (mas manter cliente se vier da URL)
+
         if (!modoCliente) {
           setClienteSelecionado("");
           setCategoriaSelecionada("");
         }
         setTipoSelecionado("");
         setArquivos([]);
-      } else {
-        setMensagem({
-          tipo: "erro",
-          texto: data.error || "Erro ao fazer upload.",
-        });
       }
     } catch (error) {
       setMensagem({
@@ -410,6 +464,26 @@ export default function HomePage() {
                 </div>
               )}
             </div>
+
+            {/* Barra de progresso para arquivos grandes */}
+            {uploading && uploadProgress && tamanhoTotal > 50 * 1024 * 1024 && (
+              <div className="space-y-2 animate-slide-in">
+                <div className="flex justify-between text-sm">
+                  <span className="font-medium text-franca-blue">
+                    Enviando... {uploadProgress.percentage}%
+                  </span>
+                  <span className="text-gray-600">
+                    {(uploadProgress.loaded / 1024 / 1024).toFixed(1)} MB / {(uploadProgress.total / 1024 / 1024).toFixed(1)} MB
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div
+                    className="bg-gradient-to-r from-franca-green to-franca-green-dark h-3 rounded-full transition-all duration-300"
+                    style={{ width: `${uploadProgress.percentage}%` }}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Mensagens */}
             {mensagem && (
