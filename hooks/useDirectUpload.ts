@@ -66,10 +66,10 @@ export function useDirectUpload(): UseDirectUploadReturn {
         throw new Error('Falha ao gerar URL de upload')
       }
 
-      const { uploadUrl, fileId, folderId } = await urlResponse.json()
+      const { uploadUrl, fileId } = await urlResponse.json()
 
-      // 2. Upload em chunks
-      await uploadInChunks(file, uploadUrl, controller.signal, (loaded, total) => {
+      // 2. Upload em chunks via PROXY
+      await uploadInChunksViaProxy(file, uploadUrl, controller.signal, (loaded, total) => {
         const percentage = Math.round((loaded / total) * 100)
         setProgress({ loaded, total, percentage })
       })
@@ -91,7 +91,8 @@ export function useDirectUpload(): UseDirectUploadReturn {
   return { upload, progress, isUploading, error, cancelUpload }
 }
 
-async function uploadInChunks(
+// Upload via proxy (evita CORS)
+async function uploadInChunksViaProxy(
   file: File,
   uploadUrl: string,
   signal: AbortSignal,
@@ -104,26 +105,35 @@ async function uploadInChunks(
     const chunk = file.slice(uploadedBytes, uploadedBytes + CHUNK_SIZE)
     const chunkSize = chunk.size
 
-    const response = await fetch(uploadUrl, {
+    // Envia chunk via PROXY (nosso servidor)
+    const response = await fetch('/api/upload-chunk', {
       method: 'PUT',
       headers: {
         'Content-Range': `bytes ${uploadedBytes}-${uploadedBytes + chunkSize - 1}/${totalSize}`,
+        'X-Upload-Url': uploadUrl, // Passa a URL do Google para o proxy
       },
       body: chunk,
       signal,
     })
 
-    if (response.status !== 308 && response.status !== 200 && response.status !== 201) {
+    const data = await response.json()
+
+    if (data.status !== 308 && data.status !== 200 && data.status !== 201) {
       // Retry: verifica onde parou
-      const rangeResponse = await fetch(uploadUrl, {
+      const rangeResponse = await fetch('/api/upload-chunk', {
         method: 'PUT',
-        headers: { 'Content-Range': `bytes */${totalSize}` },
+        headers: {
+          'Content-Range': `bytes */${totalSize}`,
+          'X-Upload-Url': uploadUrl,
+        },
+        body: new Blob([]),
         signal,
       })
 
-      const range = rangeResponse.headers.get('Range')
-      if (range) {
-        const match = range.match(/bytes=0-(\d+)/)
+      const rangeData = await rangeResponse.json()
+      
+      if (rangeData.range) {
+        const match = rangeData.range.match(/bytes=0-(\d+)/)
         if (match) {
           uploadedBytes = parseInt(match[1]) + 1
           onProgress(uploadedBytes, totalSize)
@@ -131,14 +141,15 @@ async function uploadInChunks(
         }
       }
 
-      throw new Error(`Erro no upload: ${response.status}`)
+      throw new Error(`Erro no upload: ${data.status}`)
     }
 
     uploadedBytes += chunkSize
     onProgress(uploadedBytes, totalSize)
 
-    if (uploadedBytes >= totalSize && (response.status === 200 || response.status === 201)) {
+    if (uploadedBytes >= totalSize && (data.status === 200 || data.status === 201)) {
       return
     }
   }
 }
+``
