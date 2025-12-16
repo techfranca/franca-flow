@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
-import { CLIENTES, CATEGORIAS, getMesAtual, getAnoAtual, getClientePorCodigo } from "@/lib/clientes";
+import { getMesAtual, getAnoAtual } from "@/lib/clientes";
+import { getClientePorCodigo } from "@/lib/kv";
 import { useSearchParams } from "next/navigation";
 import { useDirectUpload } from "@/hooks/useDirectUpload";
 
@@ -30,12 +31,13 @@ export default function HomePage() {
   // Detectar cliente pela URL
   useEffect(() => {
     if (codigoCliente) {
-      const clienteInfo = getClientePorCodigo(codigoCliente);
-      if (clienteInfo) {
-        setClienteSelecionado(clienteInfo.nome);
-        setCategoriaSelecionada(clienteInfo.categoria);
-        setModoCliente(true);
-      }
+      getClientePorCodigo(codigoCliente).then(clienteInfo => {
+        if (clienteInfo) {
+          setClienteSelecionado(clienteInfo.nome);
+          setCategoriaSelecionada(clienteInfo.categoria);
+          setModoCliente(true);
+        }
+      });
     }
   }, [codigoCliente]);
 
@@ -288,44 +290,17 @@ export default function HomePage() {
         <div className="flex-1 md:overflow-y-auto px-6 md:px-14 pb-6">
           {/* Formulário */}
           <form id="upload-form" onSubmit={handleSubmit} className="space-y-6">
-            {/* Seletor de Cliente (só aparece se NÃO vier da URL) */}
+            {/* Aviso de modo teste (quando não tem código) */}
             {!modoCliente && (
               <div className="animate-slide-in">
-                <label
-                  htmlFor="cliente"
-                  className="block text-franca-blue font-semibold mb-3 text-sm uppercase tracking-wide"
-                >
-                  Selecione o Cliente
-                </label>
-                <select
-                  id="cliente"
-                  value={clienteSelecionado}
-                  onChange={(e) => {
-                    const cliente = e.target.value;
-                    setClienteSelecionado(cliente);
-                    
-                    // Encontrar categoria do cliente
-                    for (const [cat, clientes] of Object.entries(CLIENTES)) {
-                      if (clientes.includes(cliente)) {
-                        setCategoriaSelecionada(cat);
-                        break;
-                      }
-                    }
-                  }}
-                  required
-                  className="w-full px-5 py-4 bg-white border-2 border-gray-100 rounded-xl focus:border-franca-green focus:ring-4 focus:ring-franca-green focus:ring-opacity-10 outline-none transition-all text-franca-blue font-medium appearance-none cursor-pointer hover:border-franca-green"
-                >
-                  <option value="">Escolha o cliente...</option>
-                  {CATEGORIAS.map((categoria) => (
-                    <optgroup key={categoria} label={categoria}>
-                      {CLIENTES[categoria as keyof typeof CLIENTES].map((cliente) => (
-                        <option key={cliente} value={cliente}>
-                          {cliente}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
+                <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-xl">
+                  <p className="text-yellow-800 text-sm font-semibold">
+                    ⚠️ Modo de teste ativo
+                  </p>
+                  <p className="text-yellow-700 text-xs mt-1">
+                    Para uso do cliente, acesse via link com código (?c=codigo)
+                  </p>
+                </div>
               </div>
             )}
 
