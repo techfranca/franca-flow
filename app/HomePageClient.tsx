@@ -158,7 +158,15 @@ export default function HomePage() {
   const tamanhoTotal = arquivos.reduce((sum, f) => sum + f.size, 0);
 
   return (
-    <div className="h-screen flex items-center justify-center relative overflow-hidden bg-gradient-to-br from-franca-green via-white to-franca-green-dark px-4 py-4">
+    <div className="
+  min-h-screen md:h-screen
+  flex md:items-center justify-center
+  relative
+  overflow-visible md:overflow-hidden
+  bg-gradient-to-br from-franca-green via-white to-franca-green-dark
+  px-4 py-4
+">
+
 
       {/* Elementos decorativos */}
       <div className="geometric-circle w-96 h-96 top-0 -left-48 animate-float"></div>
@@ -166,7 +174,14 @@ export default function HomePage() {
       <div className="geometric-circle w-64 h-64 top-1/2 left-1/4 animate-float" style={{ animationDelay: '4s' }}></div>
 
       {/* Card principal - ALTURA MÁXIMA E FLEX */}
-      <div className="glass-effect rounded-3xl shadow-franca-lg max-w-2xl w-full max-h-[90vh] relative z-10 animate-fade-in flex flex-col">
+      <div className="
+  glass-effect rounded-3xl shadow-franca-lg
+  max-w-2xl w-full
+  md:max-h-[90vh]
+  relative z-10 animate-fade-in
+  flex flex-col
+">
+
         
         {/* HEADER FIXO */}
         <div className="p-10 md:px-14 md:pt-10 pb-6 flex-shrink-0">
@@ -216,7 +231,7 @@ export default function HomePage() {
         </div>
 
         {/* CONTEÚDO COM SCROLL */}
-        <div className="flex-1 overflow-y-auto px-10 md:px-14 pb-6">
+        <div className="flex-1 md:overflow-y-auto px-6 md:px-14 pb-6">
           {/* Formulário */}
           <form id="upload-form" onSubmit={handleSubmit} className="space-y-6">
             {/* Seletor de Cliente (só aparece se NÃO vier da URL) */}
@@ -353,7 +368,7 @@ export default function HomePage() {
                   </div>
 
                   {/* CONTAINER COM SCROLL - ALTURA REDUZIDA */}
-                  <div className="max-h-40 overflow-y-auto space-y-2 pr-2">
+                  <div className="md:max-h-40 md:overflow-y-auto space-y-2 pr-2">
                     {arquivos.map((arquivo, index) => (
                       <div
                         key={index}
