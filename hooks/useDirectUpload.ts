@@ -22,7 +22,7 @@ interface UseDirectUploadReturn {
   cancelUpload: () => void
 }
 
-const CHUNK_SIZE = 5 * 1024 * 1024 // 5MB
+const CHUNK_SIZE = 4 * 1024 * 1024 // 4MB
 
 export function useDirectUpload(): UseDirectUploadReturn {
   const [progress, setProgress] = useState<UploadProgress | null>(null)

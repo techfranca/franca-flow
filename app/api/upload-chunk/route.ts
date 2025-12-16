@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 export const runtime = 'nodejs'
-export const maxDuration = 300 // 5 minutos
+export const maxDuration = 300
+
+// IMPORTANTE: Configuração para aceitar body grande
+export const config = {
+  api: {
+    bodyParser: false, // Desabilita parser padrão
+    responseLimit: false,
+  },
+}
 
 export async function PUT(request: NextRequest) {
   try {
@@ -15,7 +23,7 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    // Obtém o chunk do body
+    // Lê o chunk do stream
     const chunk = await request.arrayBuffer()
 
     // Envia o chunk para o Google Drive
@@ -33,7 +41,6 @@ export async function PUT(request: NextRequest) {
       'Content-Type': 'application/json',
     }
 
-    // Se tiver Range no response, passa para o cliente
     const range = response.headers.get('Range')
     if (range) {
       headers['Range'] = range
@@ -43,6 +50,7 @@ export async function PUT(request: NextRequest) {
       JSON.stringify({
         status: response.status,
         statusText: response.statusText,
+        range: range,
       }),
       {
         status: response.status,
