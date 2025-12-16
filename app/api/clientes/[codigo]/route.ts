@@ -1,12 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { getClientePorCodigo } from "@/lib/kv";
 
 export async function GET(
-  _req: Request,
-  { params }: { params: { codigo: string } }
+  _req: NextRequest,
+  context: { params: Promise<{ codigo: string }> }
 ) {
   try {
-    const cliente = await getClientePorCodigo(params.codigo);
+    const { codigo } = await context.params;
+
+    const cliente = await getClientePorCodigo(codigo);
 
     if (!cliente) {
       return NextResponse.json(
