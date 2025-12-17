@@ -18,3 +18,67 @@ body {
   position: absolute;
   pointer-events: none;
 }
+
+/* Carrossel horizontal - esconde scrollbar */
+.carousel-container::-webkit-scrollbar {
+  display: none;
+}
+
+.carousel-container {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  scroll-behavior: smooth;
+}
+
+/* Animações */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out;
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out;
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* Sombras personalizadas */
+.shadow-franca {
+  box-shadow: 0 4px 6px -1px rgba(125, 224, 141, 0.1), 0 2px 4px -1px rgba(125, 224, 141, 0.06);
+}
+
+.shadow-franca-lg {
+  box-shadow: 0 10px 15px -3px rgba(125, 224, 141, 0.15), 0 4px 6px -2px rgba(125, 224, 141, 0.1);
+}

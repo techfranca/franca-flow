@@ -1,67 +1,51 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server';
 
-export const runtime = 'nodejs'
-export const maxDuration = 300
-
-// IMPORTANTE: Configuração para aceitar body grande
-export const config = {
-  api: {
-    bodyParser: false, // Desabilita parser padrão
-    responseLimit: false,
-  },
-}
+// ⚠️ REMOVIDO O `export const config` (deprecated no App Router)
 
 export async function PUT(request: NextRequest) {
   try {
-    const uploadUrl = request.headers.get('x-upload-url')
-    const contentRange = request.headers.get('content-range')
-    
-    if (!uploadUrl || !contentRange) {
+    const uploadUrl = request.headers.get('X-Upload-Url');
+    const contentRange = request.headers.get('Content-Range');
+
+    if (!uploadUrl) {
       return NextResponse.json(
-        { error: 'Headers obrigatórios faltando' },
+        { error: 'URL de upload não fornecida' },
         { status: 400 }
-      )
+      );
     }
 
-    // Lê o chunk do stream
-    const chunk = await request.arrayBuffer()
+    // Pega o body como blob (suporta arquivos grandes)
+    const body = await request.blob();
 
-    // Envia o chunk para o Google Drive
+    // Faz proxy do upload para o Google Drive
     const response = await fetch(uploadUrl, {
       method: 'PUT',
       headers: {
-        'Content-Range': contentRange,
-        'Content-Length': chunk.byteLength.toString(),
+        'Content-Range': contentRange || '',
+        'Content-Type': 'application/octet-stream',
       },
-      body: chunk,
-    })
+      body: body,
+    });
 
-    // Retorna os headers importantes
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    }
+    // Pega informações da resposta
+    const range = response.headers.get('Range');
+    const status = response.status;
 
-    const range = response.headers.get('Range')
-    if (range) {
-      headers['Range'] = range
-    }
+    // Retorna o status para o cliente
+    return NextResponse.json({
+      status,
+      range,
+    }, { status });
 
-    return new NextResponse(
-      JSON.stringify({
-        status: response.status,
-        statusText: response.statusText,
-        range: range,
-      }),
-      {
-        status: response.status,
-        headers,
-      }
-    )
   } catch (error: any) {
-    console.error('Erro no proxy de upload:', error)
+    console.error('Erro no proxy de upload:', error);
     return NextResponse.json(
-      { error: error.message },
+      { error: 'Erro no upload', details: error.message },
       { status: 500 }
-    )
+    );
   }
 }
+
+// 🔥 Configuração correta para App Router (se precisar aumentar limite)
+export const runtime = 'nodejs'; // ou 'edge'
+export const maxDuration = 60; // segundos (só funciona em planos pagos da Vercel)

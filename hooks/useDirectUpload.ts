@@ -14,8 +14,17 @@ interface UploadMetadata {
   tipo: 'Anúncios' | 'Materiais'
 }
 
+interface UploadResult {
+  fileId: string
+  folderId: string
+}
+
 interface UseDirectUploadReturn {
-  upload: (file: File, metadata: UploadMetadata) => Promise<string>
+  upload: (
+    file: File, 
+    metadata: UploadMetadata,
+    onFileProgress?: (loaded: number, total: number) => void
+  ) => Promise<UploadResult>
   progress: UploadProgress | null
   isUploading: boolean
   error: string | null
@@ -38,7 +47,11 @@ export function useDirectUpload(): UseDirectUploadReturn {
     }
   }
 
-  const upload = async (file: File, metadata: UploadMetadata): Promise<string> => {
+  const upload = async (
+    file: File, 
+    metadata: UploadMetadata,
+    onFileProgress?: (loaded: number, total: number) => void
+  ): Promise<UploadResult> => {
     setIsUploading(true)
     setError(null)
     setProgress({ loaded: 0, total: file.size, percentage: 0 })
@@ -66,16 +79,21 @@ export function useDirectUpload(): UseDirectUploadReturn {
         throw new Error('Falha ao gerar URL de upload')
       }
 
-      const { uploadUrl, fileId } = await urlResponse.json()
+      const { uploadUrl, fileId, folderId } = await urlResponse.json()
 
       // 2. Upload em chunks via PROXY
       await uploadInChunksViaProxy(file, uploadUrl, controller.signal, (loaded, total) => {
         const percentage = Math.round((loaded / total) * 100)
         setProgress({ loaded, total, percentage })
+        
+        // ✅ Chama callback se fornecido
+        if (onFileProgress) {
+          onFileProgress(loaded, total)
+        }
       })
 
       setIsUploading(false)
-      return fileId
+      return { fileId, folderId }
 
     } catch (err: any) {
       if (err.name === 'AbortError') {
@@ -105,12 +123,11 @@ async function uploadInChunksViaProxy(
     const chunk = file.slice(uploadedBytes, uploadedBytes + CHUNK_SIZE)
     const chunkSize = chunk.size
 
-    // Envia chunk via PROXY (nosso servidor)
     const response = await fetch('/api/upload-chunk', {
       method: 'PUT',
       headers: {
         'Content-Range': `bytes ${uploadedBytes}-${uploadedBytes + chunkSize - 1}/${totalSize}`,
-        'X-Upload-Url': uploadUrl, // Passa a URL do Google para o proxy
+        'X-Upload-Url': uploadUrl,
       },
       body: chunk,
       signal,
@@ -119,7 +136,6 @@ async function uploadInChunksViaProxy(
     const data = await response.json()
 
     if (data.status !== 308 && data.status !== 200 && data.status !== 201) {
-      // Retry: verifica onde parou
       const rangeResponse = await fetch('/api/upload-chunk', {
         method: 'PUT',
         headers: {
@@ -152,4 +168,3 @@ async function uploadInChunksViaProxy(
     }
   }
 }
-``

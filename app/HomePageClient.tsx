@@ -23,31 +23,38 @@ export default function HomePage() {
   const [dragActive, setDragActive] = useState(false);
   const [modoCliente, setModoCliente] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [isDraggingCarousel, setIsDraggingCarousel] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+  
+  // 🔥 PROGRESSO TOTAL MANUAL (acumulado de todos os arquivos)
+  const [progressoTotal, setProgressoTotal] = useState<{ loaded: number; total: number; percentage: number } | null>(null);
   
   // Hook para upload direto de arquivos grandes
   const { upload: directUpload, progress: uploadProgress } = useDirectUpload();
 
   // Detectar cliente pela URL
   useEffect(() => {
-  if (!codigoCliente) {
-    setModoCliente(false);
-    return;
-  }
-
-  fetch(`/api/clientes/${codigoCliente}`)
-    .then(async (res) => {
-      if (!res.ok) throw new Error("Cliente não encontrado");
-      return res.json();
-    })
-    .then((clienteInfo) => {
-      setClienteSelecionado(clienteInfo.nome);
-      setCategoriaSelecionada(clienteInfo.categoria);
-      setModoCliente(true);
-    })
-    .catch(() => {
+    if (!codigoCliente) {
       setModoCliente(false);
-    });
-}, [codigoCliente]);
+      return;
+    }
+
+    fetch(`/api/clientes/${codigoCliente}`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Cliente não encontrado");
+        return res.json();
+      })
+      .then((clienteInfo) => {
+        setClienteSelecionado(clienteInfo.nome);
+        setCategoriaSelecionada(clienteInfo.categoria);
+        setModoCliente(true);
+      })
+      .catch(() => {
+        setModoCliente(false);
+      });
+  }, [codigoCliente]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -108,6 +115,30 @@ export default function HomePage() {
     setArquivos((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // Funções para drag do carrossel (desktop)
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!scrollContainerRef.current) return;
+    setIsDraggingCarousel(true);
+    setStartX(e.pageX - scrollContainerRef.current.offsetLeft);
+    setScrollLeft(scrollContainerRef.current.scrollLeft);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDraggingCarousel || !scrollContainerRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - scrollContainerRef.current.offsetLeft;
+    const walk = (x - startX) * 2;
+    scrollContainerRef.current.scrollLeft = scrollLeft - walk;
+  };
+
+  const handleMouseUp = () => {
+    setIsDraggingCarousel(false);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDraggingCarousel(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMensagem(null);
@@ -166,18 +197,50 @@ export default function HomePage() {
         }
       } else {
         // ==========================================
-        // ARQUIVOS GRANDES: USA UPLOAD DIRETO
+        // ARQUIVOS GRANDES: PROGRESSO EM TEMPO REAL
         // ==========================================
         const uploadedFileIds: string[] = [];
         let folderId = '';
+        
+        // 🔥 Calcula progresso total
+        const totalSize = arquivos.reduce((sum, f) => sum + f.size, 0);
+        let bytesJaEnviados = 0; // Bytes dos arquivos COMPLETOS
+        
+        setProgressoTotal({ loaded: 0, total: totalSize, percentage: 0 });
 
-        for (const arquivo of arquivos) {
-          const fileId = await directUpload(arquivo, {
-            clienteNome: clienteSelecionado,
-            categoria: categoriaSelecionada,
-            tipo: tipoSelecionado,
-          });
-          uploadedFileIds.push(fileId);
+        // 🔥 Loop com callback de progresso em tempo real
+        for (let i = 0; i < arquivos.length; i++) {
+          const arquivo = arquivos[i];
+          
+          // ✅ Passa callback para atualizar progresso em tempo real
+          const result = await directUpload(
+            arquivo,
+            {
+              clienteNome: clienteSelecionado,
+              categoria: categoriaSelecionada,
+              tipo: tipoSelecionado,
+            },
+            (loadedArquivoAtual, totalArquivoAtual) => {
+              // ✅ PROGRESSO EM TEMPO REAL!
+              const totalLoaded = bytesJaEnviados + loadedArquivoAtual;
+              const percentage = Math.round((totalLoaded / totalSize) * 100);
+              
+              setProgressoTotal({
+                loaded: totalLoaded,
+                total: totalSize,
+                percentage: Math.min(percentage, 100)
+              });
+            }
+          );
+          
+          uploadedFileIds.push(result.fileId);
+          
+          if (i === 0) {
+            folderId = result.folderId;
+          }
+          
+          // ✅ Atualiza bytes completos
+          bytesJaEnviados += arquivo.size;
         }
 
         // Notifica após todos uploads
@@ -206,6 +269,7 @@ export default function HomePage() {
         }
         setTipoSelecionado("");
         setArquivos([]);
+        setProgressoTotal(null);
       }
     } catch (error) {
       setMensagem({
@@ -217,40 +281,20 @@ export default function HomePage() {
     }
   };
 
-  const mesAtual = getMesAtual();
-  const anoAtual = getAnoAtual();
   const tamanhoTotal = arquivos.reduce((sum, f) => sum + f.size, 0);
 
   return (
-    <div className="
-  min-h-screen md:h-screen
-  flex md:items-center justify-center
-  relative
-  overflow-visible md:overflow-hidden
-  bg-gradient-to-br from-franca-green via-white to-franca-green-dark
-  px-4 py-4
-">
+    <div className="page-container min-h-screen flex items-center justify-center relative bg-gradient-to-br from-franca-green via-white to-franca-green-dark px-4 py-8">
+      {/* Elementos decorativos - AJUSTADOS */}
+      <div className="geometric-circle w-64 h-64 md:w-96 md:h-96 top-0 -left-32 md:-left-48 animate-float"></div>
+      <div className="geometric-circle w-56 h-56 md:w-80 md:h-80 bottom-0 -right-28 md:-right-40 animate-float" style={{ animationDelay: '2s' }}></div>
+      <div className="geometric-circle w-48 h-48 md:w-64 md:h-64 top-1/2 left-1/8 md:left-1/4 animate-float" style={{ animationDelay: '4s' }}></div>
 
-
-      {/* Elementos decorativos */}
-      <div className="geometric-circle w-96 h-96 top-0 -left-48 animate-float"></div>
-      <div className="geometric-circle w-80 h-80 bottom-0 -right-40 animate-float" style={{ animationDelay: '2s' }}></div>
-      <div className="geometric-circle w-64 h-64 top-1/2 left-1/4 animate-float" style={{ animationDelay: '4s' }}></div>
-
-      {/* Card principal - ALTURA MÁXIMA E FLEX */}
-      <div className="
-  glass-effect rounded-3xl shadow-franca-lg
-  max-w-2xl w-full
-  md:max-h-[90vh]
-  relative z-10 animate-fade-in
-  flex flex-col
-">
-
-        
-        {/* HEADER FIXO */}
-        <div className="p-10 md:px-14 md:pt-10 pb-6 flex-shrink-0">
-          {/* Logo e Título */}
-          <div className="flex justify-center mb-8">
+      {/* Card principal */}
+      <div className="glass-effect rounded-3xl shadow-franca-lg w-full max-w-2xl relative z-10 animate-fade-in">
+        {/* HEADER */}
+        <div className="p-8 md:p-10">
+          <div className="flex justify-center mb-6">
             <div className="text-center">
               <div className="mb-4 relative">
                 <div className="w-20 h-20 mx-auto bg-gradient-to-br from-franca-green to-franca-green-dark rounded-2xl flex items-center justify-center shadow-franca transform hover:scale-105 transition-transform duration-300">
@@ -266,14 +310,14 @@ export default function HomePage() {
                 FRANCA<span className="text-franca-green">.</span>
               </h1>
               <p className="text-franca-blue text-sm font-medium tracking-wider uppercase">
-                Flow - Upload de Materiais
+                Flow • Upload de Materiais
               </p>
             </div>
           </div>
 
           {/* Mensagem personalizada para cliente */}
           {modoCliente && clienteSelecionado && (
-            <div className="bg-gradient-to-r from-franca-green to-franca-green-dark bg-opacity-10 border-l-4 border-franca-green p-4 rounded-xl mb-4">
+            <div className="bg-gradient-to-r from-franca-green to-franca-green-dark bg-opacity-10 border-l-4 border-franca-green p-4 rounded-xl">
               <p className="text-franca-blue text-lg font-bold">
                 Olá, {clienteSelecionado}! 👋
               </p>
@@ -282,23 +326,11 @@ export default function HomePage() {
               </p>
             </div>
           )}
-
-          {/* Informação do mês */}
-          <div className="bg-franca-green bg-opacity-10 border-l-4 border-franca-green p-4 rounded-xl">
-            <p className="text-franca-blue text-sm">
-              <span className="font-bold">Mês atual:</span> {mesAtual} de {anoAtual}
-            </p>
-            <p className="text-gray-600 text-xs mt-1">
-              Os arquivos serão salvos automaticamente na pasta do mês.
-            </p>
-          </div>
         </div>
 
-        {/* CONTEÚDO COM SCROLL */}
-        <div className="flex-1 md:overflow-y-auto px-6 md:px-14 pb-6">
-          {/* Formulário */}
+        {/* CONTEÚDO */}
+        <div className="px-8 md:px-10 pb-6">
           <form id="upload-form" onSubmit={handleSubmit} className="space-y-6">
-            {/* Aviso de modo teste (quando não tem código) */}
             {!modoCliente && (
               <div className="animate-slide-in">
                 <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-xl">
@@ -343,13 +375,13 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Upload de Arquivos */}
+            {/* Upload de Arquivos - ÁREA REDUZIDA */}
             <div className="animate-slide-in" style={{ animationDelay: '0.2s' }}>
               <label className="block text-franca-blue font-semibold mb-3 text-sm uppercase tracking-wide">
                 Arquivos
               </label>
               <div
-                className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer ${
+                className={`border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer ${
                   dragActive
                     ? "border-franca-green bg-franca-green bg-opacity-5"
                     : "border-gray-300 hover:border-franca-green"
@@ -369,7 +401,7 @@ export default function HomePage() {
                   className="hidden"
                 />
                 <svg
-                  className="w-12 h-12 mx-auto mb-4 text-franca-green"
+                  className="w-10 h-10 mx-auto mb-3 text-franca-green"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -381,69 +413,70 @@ export default function HomePage() {
                     d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
                   />
                 </svg>
-                <p className="text-franca-blue font-semibold mb-2">
-                  Clique ou arraste os arquivos aqui
+                <p className="text-franca-blue font-semibold mb-1 text-sm">
+                  Clique ou arraste arquivos
                 </p>
-                <p className="text-gray-500 text-sm">
-                  Fotos e vídeos (máx. 5GB por arquivo)
+                <p className="text-gray-500 text-xs">
+                  Fotos e vídeos • até 5GB
                 </p>
               </div>
 
-              {/* Lista de arquivos COM SCROLL */}
+              {/* 🔥 CARROSSEL HORIZONTAL */}
               {arquivos.length > 0 && (
-                <div className="mt-4 space-y-2">
-                  {/* Indicador de tamanho total */}
-                  <div className="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
-                    <span className="text-xs text-gray-600 font-semibold">
-                      {arquivos.length} arquivo(s) selecionado(s)
+                <div className="mt-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-700 font-semibold">
+                      Arquivos selecionados →
                     </span>
                     <span className={`text-xs font-bold ${
                       tamanhoTotal > MAX_TOTAL_SIZE ? "text-red-600" : "text-franca-green"
                     }`}>
                       {tamanhoTotal >= 1024 * 1024 * 1024 
-                        ? `${(tamanhoTotal / 1024 / 1024 / 1024).toFixed(2)} GB / 10 GB`
-                        : `${(tamanhoTotal / 1024 / 1024).toFixed(1)} MB / 10 GB`
-                      }
+                        ? `${(tamanhoTotal / 1024 / 1024 / 1024).toFixed(2)} GB`
+                        : `${(tamanhoTotal / 1024 / 1024).toFixed(1)} MB`
+                      } / 10 GB
                     </span>
                   </div>
 
-                  {/* CONTAINER COM SCROLL - ALTURA REDUZIDA */}
-                  <div className="md:max-h-40 md:overflow-y-auto space-y-2 pr-2">
+                  <div
+                    ref={scrollContainerRef}
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={handleMouseLeave}
+                    className="flex gap-3 overflow-x-auto pb-2 carousel-container"
+                    style={{
+                      scrollbarWidth: 'none',
+                      msOverflowStyle: 'none',
+                      cursor: isDraggingCarousel ? 'grabbing' : 'grab',
+                      userSelect: 'none'
+                    }}
+                  >
                     {arquivos.map((arquivo, index) => (
                       <div
                         key={index}
-                        className="flex items-center justify-between bg-white p-3 rounded-lg border border-gray-200"
+                        className="flex-shrink-0 w-48 bg-white p-3 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow"
+                        style={{ pointerEvents: isDraggingCarousel ? 'none' : 'auto' }}
                       >
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <svg
-                            className="w-5 h-5 text-franca-green flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                            />
-                          </svg>
-                          <span className="text-sm text-gray-700 font-medium truncate">
-                            {arquivo.name}
-                          </span>
-                          <span className="text-xs text-gray-500 flex-shrink-0">
-                            ({(arquivo.size / 1024 / 1024).toFixed(2)} MB)
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="text-xs text-gray-700 font-medium truncate flex-1">
+                              {arquivo.name}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => removerArquivo(index)}
+                              className="text-red-500 hover:text-red-700 transition-colors flex-shrink-0"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                          <span className="text-xs text-gray-500">
+                            {(arquivo.size / 1024 / 1024).toFixed(2)} MB
                           </span>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => removerArquivo(index)}
-                          className="text-red-500 hover:text-red-700 transition-colors flex-shrink-0 ml-2"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
                       </div>
                     ))}
                   </div>
@@ -451,21 +484,27 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* Barra de progresso para arquivos grandes */}
-            {uploading && uploadProgress && tamanhoTotal > 50 * 1024 * 1024 && (
+            {/* 🔥 Barra de progresso TOTAL (acumulada em tempo real) */}
+            {uploading && progressoTotal && tamanhoTotal > 50 * 1024 * 1024 && (
               <div className="space-y-2 animate-slide-in">
                 <div className="flex justify-between text-sm">
                   <span className="font-medium text-franca-blue">
-                    Enviando... {uploadProgress.percentage}%
+                    Enviando arquivos... {progressoTotal.percentage}%
                   </span>
                   <span className="text-gray-600">
-                    {(uploadProgress.loaded / 1024 / 1024).toFixed(1)} MB / {(uploadProgress.total / 1024 / 1024).toFixed(1)} MB
+                    {progressoTotal.loaded >= 1024 * 1024 * 1024
+                      ? `${(progressoTotal.loaded / 1024 / 1024 / 1024).toFixed(2)} GB`
+                      : `${(progressoTotal.loaded / 1024 / 1024).toFixed(1)} MB`
+                    } / {progressoTotal.total >= 1024 * 1024 * 1024
+                      ? `${(progressoTotal.total / 1024 / 1024 / 1024).toFixed(2)} GB`
+                      : `${(progressoTotal.total / 1024 / 1024).toFixed(1)} MB`
+                    }
                   </span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-3">
                   <div
                     className="bg-gradient-to-r from-franca-green to-franca-green-dark h-3 rounded-full transition-all duration-300"
-                    style={{ width: `${uploadProgress.percentage}%` }}
+                    style={{ width: `${progressoTotal.percentage}%` }}
                   />
                 </div>
               </div>
@@ -515,13 +554,13 @@ export default function HomePage() {
           </form>
         </div>
 
-        {/* FOOTER COM BOTÃO FIXO */}
-        <div className="p-10 md:px-14 md:pb-10 pt-6 flex-shrink-0 border-t border-gray-100">
+        {/* FOOTER COM BOTÃO FIXO - ✅ BORDA VERDE ADICIONADA */}
+        <div className="p-8 md:p-10 pt-6 border-t border-gray-100">
           <button
             type="submit"
             form="upload-form"
             disabled={uploading || tamanhoTotal > MAX_TOTAL_SIZE}
-            className="w-full bg-gradient-to-r from-franca-green to-franca-green-dark hover:from-franca-green-dark hover:to-franca-green text-franca-blue font-bold py-4 px-6 rounded-xl transition-all duration-300 shadow-franca hover:shadow-franca-lg disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] active:scale-[0.98]"
+            className="w-full bg-gradient-to-r from-franca-green to-franca-green-dark hover:from-franca-green-dark hover:to-franca-green text-franca-blue font-bold py-4 px-6 rounded-xl border-2 border-franca-green transition-all duration-300 shadow-franca hover:shadow-franca-lg disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] active:scale-[0.98]"
           >
             {uploading ? (
               <span className="flex items-center justify-center">
@@ -561,7 +600,6 @@ export default function HomePage() {
             )}
           </button>
 
-          {/* Footer text */}
           <div className="mt-4 text-center">
             <p className="text-gray-500 text-xs">
               Sistema exclusivo para clientes Franca
