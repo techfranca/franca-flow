@@ -284,14 +284,14 @@ export default function HomePage() {
   const tamanhoTotal = arquivos.reduce((sum, f) => sum + f.size, 0);
 
   return (
-    <div className="page-container min-h-screen flex items-center justify-center relative bg-gradient-to-br from-franca-green via-white to-franca-green-dark px-4 py-8">
+    <div className="page-container h-screen flex items-center justify-center relative bg-gradient-to-br from-franca-green via-white to-franca-green-dark px-4 py-8 overflow-y-auto">
       {/* Elementos decorativos - AJUSTADOS */}
       <div className="geometric-circle w-64 h-64 md:w-96 md:h-96 top-0 -left-32 md:-left-48 animate-float"></div>
       <div className="geometric-circle w-56 h-56 md:w-80 md:h-80 bottom-0 -right-28 md:-right-40 animate-float" style={{ animationDelay: '2s' }}></div>
       <div className="geometric-circle w-48 h-48 md:w-64 md:h-64 top-1/2 left-1/8 md:left-1/4 animate-float" style={{ animationDelay: '4s' }}></div>
 
-      {/* Card principal */}
-      <div className="glass-effect rounded-3xl shadow-franca-lg w-full max-w-2xl relative z-10 animate-fade-in">
+      {/* Card principal - MARGEM ADICIONADA */}
+      <div className="glass-effect rounded-3xl shadow-franca-lg w-full max-w-2xl relative z-10 animate-fade-in my-4 md:my-0">
         {/* HEADER */}
         <div className="p-8 md:p-10">
           <div className="flex justify-center mb-6">
@@ -554,7 +554,7 @@ export default function HomePage() {
           </form>
         </div>
 
-        {/* FOOTER COM BOTÃO FIXO - ✅ BORDA VERDE ADICIONADA */}
+        {/* FOOTER COM BOTÃO FIXO - ✅ BORDA VERDE */}
         <div className="p-8 md:p-10 pt-6 border-t border-gray-100">
           <button
             type="submit"

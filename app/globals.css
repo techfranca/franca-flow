@@ -1,16 +1,61 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
+/* ==========================================
+   VIEWPORT E MOBILE FIXES - BLOQUEIA BOUNCE
+   ========================================== */
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  box-sizing: border-box;
+}
+
+html {
+  overflow-x: hidden;
+  max-width: 100vw;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+  height: 100%;
+  position: fixed;
+  width: 100%;
+}
+
 body {
   font-family: 'Poppins', sans-serif;
   background: #f9fafb;
+  overflow-x: hidden;
+  max-width: 100vw;
+  overscroll-behavior: none;
+  height: 100%;
+  width: 100%;
+  position: fixed;
+  top: 0;
+  left: 0;
 }
+
+.page-container {
+  max-width: 100vw;
+  overflow-x: hidden;
+  overscroll-behavior: none;
+  height: 100vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ==========================================
+   GLASS EFFECT
+   ========================================== */
 
 .glass-effect {
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
+
+/* ==========================================
+   ELEMENTOS DECORATIVOS
+   ========================================== */
 
 .geometric-circle {
   background: radial-gradient(circle, rgba(125, 224, 141, 0.15) 0%, rgba(125, 224, 141, 0.05) 50%, transparent 100%);
@@ -19,7 +64,10 @@ body {
   pointer-events: none;
 }
 
-/* Carrossel horizontal - esconde scrollbar */
+/* ==========================================
+   CARROSSEL HORIZONTAL
+   ========================================== */
+
 .carousel-container::-webkit-scrollbar {
   display: none;
 }
@@ -28,9 +76,14 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
   scroll-behavior: smooth;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
 }
 
-/* Animações */
+/* ==========================================
+   ANIMAÇÕES
+   ========================================== */
+
 @keyframes fade-in {
   from {
     opacity: 0;
@@ -74,7 +127,10 @@ body {
   animation: float 6s ease-in-out infinite;
 }
 
-/* Sombras personalizadas */
+/* ==========================================
+   SOMBRAS PERSONALIZADAS
+   ========================================== */
+
 .shadow-franca {
   box-shadow: 0 4px 6px -1px rgba(125, 224, 141, 0.1), 0 2px 4px -1px rgba(125, 224, 141, 0.06);
 }
