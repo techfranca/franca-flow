@@ -65,11 +65,13 @@ async function findOrCreateFolder(
   return created.data.id!
 }
 
+// 🆕 Função atualizada para aceitar descrição
 async function navigateToFinalFolder(
   drive: ReturnType<typeof getDrive>,
   clienteNome: string,
   categoria: string,
-  tipo: 'Anúncios' | 'Materiais'
+  tipo: 'Anúncios' | 'Materiais',
+  descricao?: string // 🆕
 ): Promise<string> {
   const clientesId = await findOrCreateFolder(drive, 'Clientes', MARKETING_FOLDER_ID)
   const categoriaId = await findOrCreateFolder(drive, categoria, clientesId)
@@ -78,6 +80,13 @@ async function navigateToFinalFolder(
   const tipoId = await findOrCreateFolder(drive, tipo, designCriativosId)
   const anoId = await findOrCreateFolder(drive, getAnoAtual().toString(), tipoId)
   const mesId = await findOrCreateFolder(drive, getMesFormatado(), anoId)
+
+  // 🆕 LÓGICA NOVA: Se tiver descrição, cria subpasta
+  if (descricao && descricao.trim().length > 0) {
+    const nomePasta = descricao.substring(0, 60).replace(/[/\\]/g, '-').trim()
+    const descricaoId = await findOrCreateFolder(drive, nomePasta, mesId)
+    return descricaoId
+  }
 
   return mesId
 }
@@ -89,7 +98,6 @@ async function getAuthToken(drive: ReturnType<typeof getDrive>): Promise<string>
     throw new Error('Auth não configurado')
   }
 
-  // Tenta obter o cliente de autenticação
   let authClient
   if (typeof auth.getClient === 'function') {
     authClient = await auth.getClient()
@@ -97,7 +105,6 @@ async function getAuthToken(drive: ReturnType<typeof getDrive>): Promise<string>
     authClient = auth
   }
 
-  // Obtém o token
   const tokenResponse = await authClient.getAccessToken()
   
   if (!tokenResponse.token) {
@@ -109,14 +116,14 @@ async function getAuthToken(drive: ReturnType<typeof getDrive>): Promise<string>
 
 export async function POST(request: NextRequest) {
   try {
-    const { fileName, mimeType, fileSize, clienteNome, categoria, tipo } = await request.json()
+    // 🆕 Extrai descrição do JSON
+    const { fileName, mimeType, fileSize, clienteNome, categoria, tipo, descricao } = await request.json()
 
     const drive = getDrive()
 
-    // Cria estrutura de pastas (reutiliza sua lógica)
-    const finalFolderId = await navigateToFinalFolder(drive, clienteNome, categoria, tipo)
+    // 🆕 Passa descrição para a navegação
+    const finalFolderId = await navigateToFinalFolder(drive, clienteNome, categoria, tipo, descricao)
 
-    // Cria arquivo vazio
     const file = await drive.files.create({
       supportsAllDrives: true,
       requestBody: {
@@ -127,11 +134,8 @@ export async function POST(request: NextRequest) {
     })
 
     const fileId = file.data.id!
-
-    // Obtém token de autenticação
     const token = await getAuthToken(drive)
 
-    // Inicia sessão de upload resumível
     const response = await fetch(
       `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=resumable&supportsAllDrives=true`,
       {

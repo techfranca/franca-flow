@@ -58,7 +58,6 @@ export default function HomePage() {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (uploading) {
         e.preventDefault();
-        // O texto padrão do navegador será exibido
         e.returnValue = ""; 
       }
     };
@@ -175,7 +174,14 @@ export default function HomePage() {
         setProgressoTotal({ loaded: 0, total: tamanhoTotal, percentage: 0 });
 
         for (let i = 0; i < arquivos.length; i++) {
-          const result = await directUpload(arquivos[i], { clienteNome: clienteSelecionado, categoria: categoriaSelecionada, tipo: tipoSelecionado }, 
+          const result = await directUpload(
+            arquivos[i],
+            { 
+              clienteNome: clienteSelecionado, 
+              categoria: categoriaSelecionada, 
+              tipo: tipoSelecionado,
+              descricao: descricao // 🆕 Passando a descrição aqui!
+            }, 
             (loaded) => {
               const total = bytesEnviados + loaded;
               setProgressoTotal({ loaded: total, total: tamanhoTotal, percentage: Math.min(Math.round((total/tamanhoTotal)*100), 100) });

@@ -44,6 +44,7 @@ interface UploadParams {
   clienteNome: string
   categoria: string
   tipo: 'Anúncios' | 'Materiais'
+  descricao?: string // 🆕 Campo opcional adicionado
   files: Array<{
     name: string
     buffer: Buffer
@@ -69,6 +70,7 @@ async function findOrCreateFolder(
   name: string,
   parentId: string
 ): Promise<string> {
+  // Escapa aspas simples para evitar erro na query do Drive
   const safeName = name.replace(/'/g, "\\'")
 
   const res = await drive.files.list({
@@ -103,10 +105,12 @@ async function navigateToFinalFolder(
     clienteNome,
     categoria,
     tipo,
+    descricao,
   }: {
     clienteNome: string
     categoria: string
     tipo: 'Anúncios' | 'Materiais'
+    descricao?: string
   }
 ): Promise<string> {
   const clientesId = await findOrCreateFolder(drive, 'Clientes', MARKETING_FOLDER_ID)
@@ -116,6 +120,14 @@ async function navigateToFinalFolder(
   const tipoId = await findOrCreateFolder(drive, tipo, designCriativosId)
   const anoId = await findOrCreateFolder(drive, getAnoAtual().toString(), tipoId)
   const mesId = await findOrCreateFolder(drive, getMesFormatado(), anoId)
+
+  // 🆕 LÓGICA NOVA: Cria subpasta com a descrição se houver
+  if (descricao && descricao.trim().length > 0) {
+    // Sanitiza: remove caracteres inválidos de path e limita tamanho
+    const nomePasta = descricao.substring(0, 60).replace(/[/\\]/g, '-').trim()
+    const descricaoId = await findOrCreateFolder(drive, nomePasta, mesId)
+    return descricaoId
+  }
 
   return mesId
 }
@@ -128,6 +140,7 @@ export async function uploadFilesToDrive({
   clienteNome,
   categoria,
   tipo,
+  descricao,
   files,
 }: UploadParams): Promise<{ success: boolean; message: string; folderId?: string }> {
   try {
@@ -137,6 +150,7 @@ export async function uploadFilesToDrive({
       clienteNome,
       categoria,
       tipo,
+      descricao, // Passa a descrição para a navegação
     })
 
     await Promise.all(
@@ -159,7 +173,7 @@ export async function uploadFilesToDrive({
     return {
       success: true,
       message: `${files.length} arquivo(s) enviados com sucesso!`,
-      folderId: finalFolderId, // Retorna o ID da pasta criada
+      folderId: finalFolderId,
     }
   } catch (error) {
     console.error('Erro no upload:', error)

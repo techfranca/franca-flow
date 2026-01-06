@@ -1,170 +1,68 @@
-'use client'
+import { useState } from 'react';
 
-import { useState } from 'react'
-
-interface UploadProgress {
-  loaded: number
-  total: number
-  percentage: number
+interface DirectUploadOptions {
+  clienteNome: string;
+  categoria: string;
+  tipo: string;
+  descricao?: string; // 🆕 Campo opcional
 }
 
-interface UploadMetadata {
-  clienteNome: string
-  categoria: string
-  tipo: 'Anúncios' | 'Materiais'
-}
-
-interface UploadResult {
-  fileId: string
-  folderId: string
-}
-
-interface UseDirectUploadReturn {
-  upload: (
-    file: File, 
-    metadata: UploadMetadata,
-    onFileProgress?: (loaded: number, total: number) => void
-  ) => Promise<UploadResult>
-  progress: UploadProgress | null
-  isUploading: boolean
-  error: string | null
-  cancelUpload: () => void
-}
-
-const CHUNK_SIZE = 4 * 1024 * 1024 // 4MB
-
-export function useDirectUpload(): UseDirectUploadReturn {
-  const [progress, setProgress] = useState<UploadProgress | null>(null)
-  const [isUploading, setIsUploading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [abortController, setAbortController] = useState<AbortController | null>(null)
-
-  const cancelUpload = () => {
-    if (abortController) {
-      abortController.abort()
-      setIsUploading(false)
-      setProgress(null)
-    }
-  }
+export function useDirectUpload() {
+  const [progress, setProgress] = useState(0);
 
   const upload = async (
-    file: File, 
-    metadata: UploadMetadata,
-    onFileProgress?: (loaded: number, total: number) => void
-  ): Promise<UploadResult> => {
-    setIsUploading(true)
-    setError(null)
-    setProgress({ loaded: 0, total: file.size, percentage: 0 })
-
-    const controller = new AbortController()
-    setAbortController(controller)
-
+    file: File,
+    options: DirectUploadOptions,
+    onProgress?: (loaded: number, total: number) => void
+  ) => {
     try {
-      // 1. Gera URL de upload
-      const urlResponse = await fetch('/api/generate-upload-url', {
+      // 1. Obter URL de upload assinada
+      const initRes = await fetch('/api/generate-upload-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fileName: file.name,
           mimeType: file.type,
           fileSize: file.size,
-          clienteNome: metadata.clienteNome,
-          categoria: metadata.categoria,
-          tipo: metadata.tipo,
+          clienteNome: options.clienteNome,
+          categoria: options.categoria,
+          tipo: options.tipo,
+          descricao: options.descricao, // 🆕 Envia a descrição
         }),
-        signal: controller.signal,
-      })
+      });
 
-      if (!urlResponse.ok) {
-        throw new Error('Falha ao gerar URL de upload')
+      if (!initRes.ok) throw new Error('Falha ao iniciar upload');
+      const { uploadUrl, fileId, folderId } = await initRes.json();
+
+      // 2. Fazer upload em chunks
+      const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+      let start = 0;
+
+      while (start < file.size) {
+        const end = Math.min(start + CHUNK_SIZE, file.size);
+        const chunk = file.slice(start, end);
+
+        const res = await fetch('/api/upload-chunk', {
+          method: 'PUT',
+          headers: {
+            'X-Upload-Url': uploadUrl,
+            'Content-Range': `bytes ${start}-${end - 1}/${file.size}`,
+          },
+          body: chunk,
+        });
+
+        if (!res.ok && res.status !== 308) throw new Error('Erro no upload do chunk');
+
+        start = end;
+        if (onProgress) onProgress(start, file.size);
       }
 
-      const { uploadUrl, fileId, folderId } = await urlResponse.json()
-
-      // 2. Upload em chunks via PROXY
-      await uploadInChunksViaProxy(file, uploadUrl, controller.signal, (loaded, total) => {
-        const percentage = Math.round((loaded / total) * 100)
-        setProgress({ loaded, total, percentage })
-        
-        // ✅ Chama callback se fornecido
-        if (onFileProgress) {
-          onFileProgress(loaded, total)
-        }
-      })
-
-      setIsUploading(false)
-      return { fileId, folderId }
-
-    } catch (err: any) {
-      if (err.name === 'AbortError') {
-        setError('Upload cancelado')
-      } else {
-        setError(err.message || 'Erro no upload')
-      }
-      setIsUploading(false)
-      throw err
+      return { success: true, fileId, folderId };
+    } catch (error) {
+      console.error(error);
+      throw error;
     }
-  }
+  };
 
-  return { upload, progress, isUploading, error, cancelUpload }
-}
-
-// Upload via proxy (evita CORS)
-async function uploadInChunksViaProxy(
-  file: File,
-  uploadUrl: string,
-  signal: AbortSignal,
-  onProgress: (loaded: number, total: number) => void
-): Promise<void> {
-  const totalSize = file.size
-  let uploadedBytes = 0
-
-  while (uploadedBytes < totalSize) {
-    const chunk = file.slice(uploadedBytes, uploadedBytes + CHUNK_SIZE)
-    const chunkSize = chunk.size
-
-    const response = await fetch('/api/upload-chunk', {
-      method: 'PUT',
-      headers: {
-        'Content-Range': `bytes ${uploadedBytes}-${uploadedBytes + chunkSize - 1}/${totalSize}`,
-        'X-Upload-Url': uploadUrl,
-      },
-      body: chunk,
-      signal,
-    })
-
-    const data = await response.json()
-
-    if (data.status !== 308 && data.status !== 200 && data.status !== 201) {
-      const rangeResponse = await fetch('/api/upload-chunk', {
-        method: 'PUT',
-        headers: {
-          'Content-Range': `bytes */${totalSize}`,
-          'X-Upload-Url': uploadUrl,
-        },
-        body: new Blob([]),
-        signal,
-      })
-
-      const rangeData = await rangeResponse.json()
-      
-      if (rangeData.range) {
-        const match = rangeData.range.match(/bytes=0-(\d+)/)
-        if (match) {
-          uploadedBytes = parseInt(match[1]) + 1
-          onProgress(uploadedBytes, totalSize)
-          continue
-        }
-      }
-
-      throw new Error(`Erro no upload: ${data.status}`)
-    }
-
-    uploadedBytes += chunkSize
-    onProgress(uploadedBytes, totalSize)
-
-    if (uploadedBytes >= totalSize && (data.status === 200 || data.status === 201)) {
-      return
-    }
-  }
+  return { upload, progress };
 }

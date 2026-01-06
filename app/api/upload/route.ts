@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
     const clienteNome = formData.get('clienteNome') as string
     const categoria = formData.get('categoria') as string
     const tipo = formData.get('tipo') as 'Anúncios' | 'Materiais'
-    const descricao = formData.get('descricao') as string || '' // 🆕 Campo descrição capturado aqui
+    const descricao = (formData.get('descricao') as string) || '' // 🆕 Captura descrição
 
     if (!clienteNome || !categoria || !tipo) {
       return NextResponse.json(
@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
       clienteNome,
       categoria,
       tipo,
+      descricao, // 🆕 Passa para a função de upload
       files,
     })
 
@@ -54,14 +55,13 @@ export async function POST(request: NextRequest) {
         ? `https://drive.google.com/drive/folders/${result.folderId}`
         : undefined
 
-      // 🆕 Passa descrição para notificação (CORREÇÃO APLICADA AQUI)
       await notificarTime({
         clienteNome,
         categoria,
         tipo,
         quantidade: files.length,
         driveLink,
-        descricao, // <--- Adicionado para enviar a mensagem correta
+        descricao,
       })
 
       return NextResponse.json({
