@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
   try {
-    const { clienteNome, categoria, tipo, quantidade, driveLink } = await request.json()
+    const { clienteNome, categoria, tipo, quantidade, descricao, driveLink } = await request.json() // 🆕 descricao
 
     const token = process.env.UAIZAP_TOKEN
     const groupId = process.env.UAIZAP_GROUP_ID
@@ -18,6 +18,30 @@ export async function POST(request: NextRequest) {
       timeStyle: 'short',
     })
 
+    // 🆕 Monta mensagem com descrição
+    let mensagem = `📥 *Novo upload recebido!*
+
+👤 Cliente: ${clienteNome}
+📂 Categoria: ${categoria}
+📁 Tipo: ${tipo}
+📎 Arquivos: ${quantidade}`
+
+    // 🆕 Adiciona descrição se fornecida
+    if (descricao && descricao.trim()) {
+      mensagem += `
+📝 Descrição: ${descricao.trim()}`
+    }
+
+    // Adiciona link do Drive
+    if (driveLink) {
+      mensagem += `
+📂 Pasta no Drive:
+${driveLink}`
+    }
+
+    mensagem += `
+🕒 Data: ${dataHoraBrasil}`
+
     const res = await fetch('https://francaassessoria.uazapi.com/send/text', {
       method: 'POST',
       headers: {
@@ -26,14 +50,7 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         number: groupId,
-        text: `📥 *Novo upload recebido!*
-
-👤 Cliente: ${clienteNome}
-📂 Categoria: ${categoria}
-📁 Tipo: ${tipo}
-📎 Arquivos: ${quantidade}
-${driveLink ? `📂 Pasta no Drive:\n${driveLink}` : ''}
-🕒 Data: ${dataHoraBrasil}`,
+        text: mensagem,
       }),
     })
 

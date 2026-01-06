@@ -9,6 +9,7 @@ export async function POST(request: NextRequest) {
     const clienteNome = formData.get('clienteNome') as string
     const categoria = formData.get('categoria') as string
     const tipo = formData.get('tipo') as 'Anúncios' | 'Materiais'
+    const descricao = formData.get('descricao') as string || '' // 🆕 Campo descrição
 
     if (!clienteNome || !categoria || !tipo) {
       return NextResponse.json(
@@ -49,17 +50,17 @@ export async function POST(request: NextRequest) {
     })
 
     if (result.success) {
-      // Passar o folderId como parâmetro para o notificarTime
       const driveLink = result.folderId
         ? `https://drive.google.com/drive/folders/${result.folderId}`
         : undefined
 
+      // 🆕 Passa descrição para notificação
       await notificarTime({
         clienteNome,
         categoria,
         tipo,
         quantidade: files.length,
-        driveLink, // Passando o link da pasta para a notificação
+        driveLink,
       })
 
       return NextResponse.json({

@@ -17,6 +17,7 @@ export default function HomePage() {
   const [clienteSelecionado, setClienteSelecionado] = useState("");
   const [categoriaSelecionada, setCategoriaSelecionada] = useState("");
   const [tipoSelecionado, setTipoSelecionado] = useState<"Anúncios" | "Materiais" | "">("");
+  const [descricao, setDescricao] = useState(""); // 🆕 Campo de descrição
   const [arquivos, setArquivos] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [mensagem, setMensagem] = useState<{ tipo: "sucesso" | "erro"; texto: string } | null>(null);
@@ -28,10 +29,8 @@ export default function HomePage() {
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
   
-  // 🔥 PROGRESSO TOTAL MANUAL (acumulado de todos os arquivos)
   const [progressoTotal, setProgressoTotal] = useState<{ loaded: number; total: number; percentage: number } | null>(null);
   
-  // Hook para upload direto de arquivos grandes
   const { upload: directUpload, progress: uploadProgress } = useDirectUpload();
 
   // Detectar cliente pela URL
@@ -64,7 +63,6 @@ export default function HomePage() {
   };
 
   const adicionarArquivos = (novosArquivos: File[]) => {
-    // Validar tamanho de cada arquivo (máximo 5GB)
     const arquivosGrandes = novosArquivos.filter(f => f.size > MAX_FILE_SIZE);
     if (arquivosGrandes.length > 0) {
       setMensagem({
@@ -74,7 +72,6 @@ export default function HomePage() {
       return;
     }
 
-    // Validar tamanho total (máximo 10GB)
     const tamanhoAtual = arquivos.reduce((sum, f) => sum + f.size, 0);
     const tamanhoNovos = novosArquivos.reduce((sum, f) => sum + f.size, 0);
     
@@ -115,7 +112,6 @@ export default function HomePage() {
     setArquivos((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Funções para drag do carrossel (desktop)
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!scrollContainerRef.current) return;
     setIsDraggingCarousel(true);
@@ -154,18 +150,15 @@ export default function HomePage() {
     setUploading(true);
 
     try {
-      // Detecta tamanho total
       const tamanhoTotal = arquivos.reduce((sum, f) => sum + f.size, 0);
       const LIMITE_SERVIDOR = 50 * 1024 * 1024; // 50MB
 
       if (tamanhoTotal <= LIMITE_SERVIDOR) {
-        // ==========================================
-        // ARQUIVOS PEQUENOS: USA ROTA ATUAL
-        // ==========================================
         const formData = new FormData();
         formData.append("clienteNome", clienteSelecionado);
         formData.append("categoria", categoriaSelecionada);
         formData.append("tipo", tipoSelecionado);
+        formData.append("descricao", descricao); // 🆕 Adiciona descrição
 
         arquivos.forEach((arquivo, index) => {
           formData.append(`file_${index}`, arquivo);
@@ -188,6 +181,7 @@ export default function HomePage() {
             setCategoriaSelecionada("");
           }
           setTipoSelecionado("");
+          setDescricao(""); // 🆕 Limpa descrição
           setArquivos([]);
         } else {
           setMensagem({
@@ -196,23 +190,17 @@ export default function HomePage() {
           });
         }
       } else {
-        // ==========================================
-        // ARQUIVOS GRANDES: PROGRESSO EM TEMPO REAL
-        // ==========================================
         const uploadedFileIds: string[] = [];
         let folderId = '';
         
-        // 🔥 Calcula progresso total
         const totalSize = arquivos.reduce((sum, f) => sum + f.size, 0);
-        let bytesJaEnviados = 0; // Bytes dos arquivos COMPLETOS
+        let bytesJaEnviados = 0;
         
         setProgressoTotal({ loaded: 0, total: totalSize, percentage: 0 });
 
-        // 🔥 Loop com callback de progresso em tempo real
         for (let i = 0; i < arquivos.length; i++) {
           const arquivo = arquivos[i];
           
-          // ✅ Passa callback para atualizar progresso em tempo real
           const result = await directUpload(
             arquivo,
             {
@@ -221,7 +209,6 @@ export default function HomePage() {
               tipo: tipoSelecionado,
             },
             (loadedArquivoAtual, totalArquivoAtual) => {
-              // ✅ PROGRESSO EM TEMPO REAL!
               const totalLoaded = bytesJaEnviados + loadedArquivoAtual;
               const percentage = Math.round((totalLoaded / totalSize) * 100);
               
@@ -239,11 +226,10 @@ export default function HomePage() {
             folderId = result.folderId;
           }
           
-          // ✅ Atualiza bytes completos
           bytesJaEnviados += arquivo.size;
         }
 
-        // Notifica após todos uploads
+        // 🆕 Adiciona descrição na notificação
         await fetch('/api/notify-after-upload', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -252,6 +238,7 @@ export default function HomePage() {
             categoria: categoriaSelecionada,
             tipo: tipoSelecionado,
             quantidade: arquivos.length,
+            descricao: descricao, // 🆕
             driveLink: folderId 
               ? `https://drive.google.com/drive/folders/${folderId}`
               : undefined,
@@ -268,6 +255,7 @@ export default function HomePage() {
           setCategoriaSelecionada("");
         }
         setTipoSelecionado("");
+        setDescricao(""); // 🆕 Limpa descrição
         setArquivos([]);
         setProgressoTotal(null);
       }
@@ -285,12 +273,10 @@ export default function HomePage() {
 
   return (
     <div className="page-container h-screen flex items-center justify-center relative bg-gradient-to-br from-franca-green via-white to-franca-green-dark px-4 py-8 overflow-y-auto">
-      {/* Elementos decorativos - AJUSTADOS */}
       <div className="geometric-circle w-64 h-64 md:w-96 md:h-96 top-0 -left-32 md:-left-48 animate-float"></div>
       <div className="geometric-circle w-56 h-56 md:w-80 md:h-80 bottom-0 -right-28 md:-right-40 animate-float" style={{ animationDelay: '2s' }}></div>
       <div className="geometric-circle w-48 h-48 md:w-64 md:h-64 top-1/2 left-1/8 md:left-1/4 animate-float" style={{ animationDelay: '4s' }}></div>
 
-      {/* Card principal - MARGEM ADICIONADA */}
       <div className="glass-effect rounded-3xl shadow-franca-lg w-full max-w-2xl relative z-10 animate-fade-in my-4 md:my-0">
         {/* HEADER */}
         <div className="p-8 md:p-10">
@@ -315,7 +301,6 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Mensagem personalizada para cliente */}
           {modoCliente && clienteSelecionado && (
             <div className="bg-gradient-to-r from-franca-green to-franca-green-dark bg-opacity-10 border-l-4 border-franca-green p-4 rounded-xl">
               <p className="text-franca-blue text-lg font-bold">
@@ -375,7 +360,25 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Upload de Arquivos - ÁREA REDUZIDA */}
+            {/* 🆕 CAMPO DE DESCRIÇÃO */}
+            <div className="animate-slide-in" style={{ animationDelay: '0.15s' }}>
+              <label className="block text-franca-blue font-semibold mb-3 text-sm uppercase tracking-wide">
+                Descrição (Opcional)
+              </label>
+              <textarea
+                value={descricao}
+                onChange={(e) => setDescricao(e.target.value)}
+                placeholder="Ex: Artes para feed de janeiro, vídeos da campanha de Black Friday..."
+                className="w-full px-4 py-3 bg-white border-2 border-gray-100 rounded-xl focus:border-franca-green focus:ring-4 focus:ring-franca-green focus:ring-opacity-10 outline-none transition-all text-franca-blue resize-none"
+                rows={3}
+                maxLength={500}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                {descricao.length}/500 caracteres
+              </p>
+            </div>
+
+            {/* Upload de Arquivos */}
             <div className="animate-slide-in" style={{ animationDelay: '0.2s' }}>
               <label className="block text-franca-blue font-semibold mb-3 text-sm uppercase tracking-wide">
                 Arquivos
@@ -421,7 +424,6 @@ export default function HomePage() {
                 </p>
               </div>
 
-              {/* 🔥 CARROSSEL HORIZONTAL */}
               {arquivos.length > 0 && (
                 <div className="mt-4 space-y-3">
                   <div className="flex justify-between items-center">
@@ -484,7 +486,6 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* 🔥 Barra de progresso TOTAL (acumulada em tempo real) */}
             {uploading && progressoTotal && tamanhoTotal > 50 * 1024 * 1024 && (
               <div className="space-y-2 animate-slide-in">
                 <div className="flex justify-between text-sm">
@@ -510,7 +511,6 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* Mensagens */}
             {mensagem && (
               <div
                 className={`border-l-4 p-4 rounded-xl animate-slide-in ${
@@ -554,7 +554,7 @@ export default function HomePage() {
           </form>
         </div>
 
-        {/* FOOTER COM BOTÃO FIXO - ✅ BORDA VERDE */}
+        {/* FOOTER COM BOTÃO */}
         <div className="p-8 md:p-10 pt-6 border-t border-gray-100">
           <button
             type="submit"
