@@ -53,7 +53,7 @@ export default function HomePage() {
       });
   }, [codigoCliente]);
 
-  // 2. NOVA PROTEÇÃO: Impede fechar a aba durante upload
+  // 2. Proteção contra fechamento acidental
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (uploading) {
@@ -139,8 +139,14 @@ export default function HomePage() {
     e.preventDefault();
     setMensagem(null);
 
-    if (!clienteSelecionado || !tipoSelecionado || arquivos.length === 0) {
-      setMensagem({ tipo: "erro", texto: "Preencha todos os campos e anexe arquivos." });
+    // 🔒 VALIDAÇÃO DE OBRIGATORIEDADE AQUI
+    if (!clienteSelecionado || !tipoSelecionado || !descricao.trim() || arquivos.length === 0) {
+      setMensagem({ 
+        tipo: "erro", 
+        texto: !descricao.trim() 
+          ? "A descrição é obrigatória para organizar os arquivos." 
+          : "Preencha todos os campos e anexe arquivos." 
+      });
       return;
     }
 
@@ -151,7 +157,7 @@ export default function HomePage() {
       const LIMITE_SERVIDOR = 50 * 1024 * 1024; // 50MB
 
       if (tamanhoTotal <= LIMITE_SERVIDOR) {
-        // Upload Pequeno (via Server Action/API direta)
+        // Upload Pequeno
         const formData = new FormData();
         formData.append("clienteNome", clienteSelecionado);
         formData.append("categoria", categoriaSelecionada);
@@ -168,7 +174,7 @@ export default function HomePage() {
           throw new Error(data.error);
         }
       } else {
-        // Upload Grande (Direct Upload)
+        // Upload Grande (Direct)
         let folderId = '';
         let bytesEnviados = 0;
         setProgressoTotal({ loaded: 0, total: tamanhoTotal, percentage: 0 });
@@ -180,7 +186,7 @@ export default function HomePage() {
               clienteNome: clienteSelecionado, 
               categoria: categoriaSelecionada, 
               tipo: tipoSelecionado,
-              descricao: descricao // 🆕 Passando a descrição aqui!
+              descricao: descricao 
             }, 
             (loaded) => {
               const total = bytesEnviados + loaded;
@@ -333,10 +339,10 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* DESCRIÇÃO */}
+              {/* DESCRIÇÃO - Agora Obrigatória */}
               <div>
                 <label className="block text-franca-blue font-semibold mb-2 text-sm lg:text-xs uppercase tracking-wide">
-                  Descrição (Opcional)
+                  Descrição <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   value={descricao}

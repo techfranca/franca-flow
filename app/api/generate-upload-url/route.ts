@@ -65,13 +65,12 @@ async function findOrCreateFolder(
   return created.data.id!
 }
 
-// 🆕 Função atualizada para aceitar descrição
 async function navigateToFinalFolder(
   drive: ReturnType<typeof getDrive>,
   clienteNome: string,
   categoria: string,
   tipo: 'Anúncios' | 'Materiais',
-  descricao?: string // 🆕
+  descricao: string // 🔒 AGORA OBRIGATÓRIO
 ): Promise<string> {
   const clientesId = await findOrCreateFolder(drive, 'Clientes', MARKETING_FOLDER_ID)
   const categoriaId = await findOrCreateFolder(drive, categoria, clientesId)
@@ -81,14 +80,13 @@ async function navigateToFinalFolder(
   const anoId = await findOrCreateFolder(drive, getAnoAtual().toString(), tipoId)
   const mesId = await findOrCreateFolder(drive, getMesFormatado(), anoId)
 
-  // 🆕 LÓGICA NOVA: Se tiver descrição, cria subpasta
-  if (descricao && descricao.trim().length > 0) {
-    const nomePasta = descricao.substring(0, 60).replace(/[/\\]/g, '-').trim()
-    const descricaoId = await findOrCreateFolder(drive, nomePasta, mesId)
-    return descricaoId
+  // 🔒 CRIAÇÃO OBRIGATÓRIA DA PASTA DE DESCRIÇÃO
+  const nomePasta = descricao.substring(0, 60).replace(/[/\\]/g, '-').trim()
+  if (!nomePasta) {
+     throw new Error("Descrição inválida ou vazia.")
   }
-
-  return mesId
+  const descricaoId = await findOrCreateFolder(drive, nomePasta, mesId)
+  return descricaoId
 }
 
 async function getAuthToken(drive: ReturnType<typeof getDrive>): Promise<string> {
@@ -116,12 +114,15 @@ async function getAuthToken(drive: ReturnType<typeof getDrive>): Promise<string>
 
 export async function POST(request: NextRequest) {
   try {
-    // 🆕 Extrai descrição do JSON
     const { fileName, mimeType, fileSize, clienteNome, categoria, tipo, descricao } = await request.json()
+
+    // 🔒 TRAVA DE SEGURANÇA
+    if (!descricao || !descricao.trim()) {
+      return NextResponse.json({ error: 'Descrição é obrigatória' }, { status: 400 })
+    }
 
     const drive = getDrive()
 
-    // 🆕 Passa descrição para a navegação
     const finalFolderId = await navigateToFinalFolder(drive, clienteNome, categoria, tipo, descricao)
 
     const file = await drive.files.create({

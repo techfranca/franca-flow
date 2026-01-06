@@ -44,7 +44,7 @@ interface UploadParams {
   clienteNome: string
   categoria: string
   tipo: 'Anúncios' | 'Materiais'
-  descricao?: string // 🆕 Campo opcional adicionado
+  descricao: string // 🔒 AGORA OBRIGATÓRIO
   files: Array<{
     name: string
     buffer: Buffer
@@ -70,7 +70,6 @@ async function findOrCreateFolder(
   name: string,
   parentId: string
 ): Promise<string> {
-  // Escapa aspas simples para evitar erro na query do Drive
   const safeName = name.replace(/'/g, "\\'")
 
   const res = await drive.files.list({
@@ -110,7 +109,7 @@ async function navigateToFinalFolder(
     clienteNome: string
     categoria: string
     tipo: 'Anúncios' | 'Materiais'
-    descricao?: string
+    descricao: string // 🔒
   }
 ): Promise<string> {
   const clientesId = await findOrCreateFolder(drive, 'Clientes', MARKETING_FOLDER_ID)
@@ -121,15 +120,10 @@ async function navigateToFinalFolder(
   const anoId = await findOrCreateFolder(drive, getAnoAtual().toString(), tipoId)
   const mesId = await findOrCreateFolder(drive, getMesFormatado(), anoId)
 
-  // 🆕 LÓGICA NOVA: Cria subpasta com a descrição se houver
-  if (descricao && descricao.trim().length > 0) {
-    // Sanitiza: remove caracteres inválidos de path e limita tamanho
-    const nomePasta = descricao.substring(0, 60).replace(/[/\\]/g, '-').trim()
-    const descricaoId = await findOrCreateFolder(drive, nomePasta, mesId)
-    return descricaoId
-  }
-
-  return mesId
+  // 🔒 CRIAÇÃO OBRIGATÓRIA DA PASTA DE DESCRIÇÃO
+  const nomePasta = descricao.substring(0, 60).replace(/[/\\]/g, '-').trim()
+  const descricaoId = await findOrCreateFolder(drive, nomePasta, mesId)
+  return descricaoId
 }
 
 // ========================
@@ -150,7 +144,7 @@ export async function uploadFilesToDrive({
       clienteNome,
       categoria,
       tipo,
-      descricao, // Passa a descrição para a navegação
+      descricao,
     })
 
     await Promise.all(

@@ -9,11 +9,12 @@ export async function POST(request: NextRequest) {
     const clienteNome = formData.get('clienteNome') as string
     const categoria = formData.get('categoria') as string
     const tipo = formData.get('tipo') as 'Anúncios' | 'Materiais'
-    const descricao = (formData.get('descricao') as string) || '' // 🆕 Captura descrição
+    const descricao = (formData.get('descricao') as string) || ''
 
-    if (!clienteNome || !categoria || !tipo) {
+    // 🔒 TRAVA DE SEGURANÇA NO SERVIDOR
+    if (!clienteNome || !categoria || !tipo || !descricao.trim()) {
       return NextResponse.json(
-        { error: 'Dados incompletos' },
+        { error: 'Todos os campos, incluindo a descrição, são obrigatórios.' },
         { status: 400 }
       )
     }
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
       clienteNome,
       categoria,
       tipo,
-      descricao, // 🆕 Passa para a função de upload
+      descricao,
       files,
     })
 
