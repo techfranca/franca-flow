@@ -1,0 +1,15 @@
+{
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "franca-flow.vercel.app"
+        }
+      ],
+      "destination": "https://flow.francaassessoria.com/:path*",
+      "permanent": true
+    }
+  ]
+}
